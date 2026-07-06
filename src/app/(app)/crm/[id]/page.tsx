@@ -52,6 +52,10 @@ export default async function FichaClientePage({
     .eq("contacto_id", id)
     .order("fecha", { ascending: false });
 
+  const diasPromedio = perfilCompra?.dias_promedio_entre_compras
+    ? Math.ceil(Number(perfilCompra.dias_promedio_entre_compras))
+    : null;
+
   return (
     <div className="max-w-3xl space-y-6">
       {creado === "1" && (
@@ -101,11 +105,11 @@ export default async function FichaClientePage({
               <p className="text-gray-400">Total de compras</p>
               <p className="font-medium text-gray-900">{perfilCompra.total_compras}</p>
             </div>
-            {perfilCompra.dias_promedio_entre_compras && (
+            {diasPromedio !== null && (
               <div>
                 <p className="text-gray-400">Días promedio entre compras</p>
                 <p className="font-medium text-gray-900">
-                  {perfilCompra.dias_promedio_entre_compras}
+                  {diasPromedio} {diasPromedio === 1 ? "día" : "días"}
                 </p>
               </div>
             )}
