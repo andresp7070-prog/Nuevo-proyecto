@@ -62,10 +62,12 @@ export function NuevaInteraccionForm({ contactoId }: { contactoId: string }) {
         <input
           value={nota}
           onChange={(e) => setNota(e.target.value)}
-          placeholder="Nota"
+          placeholder="Nota *"
           className="rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none sm:col-span-2"
         />
       </div>
+
+      <p className="mt-2 text-xs text-gray-400">* Campo obligatorio</p>
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 

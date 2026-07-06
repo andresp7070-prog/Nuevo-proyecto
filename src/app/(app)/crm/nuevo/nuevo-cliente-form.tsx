@@ -52,7 +52,7 @@ export function NuevoClienteForm() {
 
       <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Nombre</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Nombre *</label>
           <input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
@@ -61,7 +61,7 @@ export function NuevoClienteForm() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Teléfono</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Teléfono *</label>
           <input
             value={telefono}
             onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ""))}
@@ -72,7 +72,7 @@ export function NuevoClienteForm() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Correo</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Correo *</label>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -92,6 +92,8 @@ export function NuevoClienteForm() {
           />
         </div>
       </div>
+
+      <p className="mt-3 text-xs text-gray-400">* Campos obligatorios</p>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
