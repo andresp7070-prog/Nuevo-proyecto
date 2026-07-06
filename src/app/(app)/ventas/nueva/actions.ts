@@ -47,6 +47,7 @@ export async function guardarVenta(input: {
   clienteTelefono: string;
   clienteEmail: string;
   fecha: string;
+  metodoPago: string;
   items: ItemVentaInput[];
 }) {
   const supabase = await createClient();
@@ -79,6 +80,7 @@ export async function guardarVenta(input: {
       precio_unitario: item.precioUnitario,
     })),
     p_fecha: input.fecha,
+    p_metodo_pago: input.metodoPago,
   });
 
   if (error) throw new Error(error.message);

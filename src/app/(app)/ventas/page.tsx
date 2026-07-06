@@ -12,7 +12,17 @@ type Venta = {
   fecha: string;
   monto: number;
   cliente_nombre: string | null;
+  metodo_pago: string | null;
   ventas_items: ItemLinea[];
+};
+
+const etiquetaMetodoPago: Record<string, string> = {
+  efectivo: "Efectivo",
+  tarjeta: "Tarjeta",
+  transferencia: "Transferencia",
+  nequi: "Nequi",
+  daviplata: "Daviplata",
+  otro: "Otro",
 };
 
 export default async function VentasPage({
@@ -45,7 +55,7 @@ export default async function VentasPage({
   const { data } = await supabase
     .from("ventas")
     .select(
-      "id, fecha, monto, cliente_nombre, ventas_items ( cantidad, inventario_items ( nombre ) )",
+      "id, fecha, monto, cliente_nombre, metodo_pago, ventas_items ( cantidad, inventario_items ( nombre ) )",
     )
     .eq("empresa_id", perfil.empresa_id)
     .order("fecha", { ascending: false });
@@ -103,12 +113,19 @@ export default async function VentasPage({
                   <p className="text-xs text-gray-400">{new Date(venta.fecha).toLocaleString("es-CO")}</p>
                   <p className="mt-1 text-xs text-gray-500">{productos || "Sin productos"}</p>
                 </div>
-                <span className="whitespace-nowrap font-medium text-gray-900">
-                  {Number(venta.monto).toLocaleString("es-CO", {
-                    style: "currency",
-                    currency: "COP",
-                  })}
-                </span>
+                <div className="text-right">
+                  <span className="whitespace-nowrap font-medium text-gray-900">
+                    {Number(venta.monto).toLocaleString("es-CO", {
+                      style: "currency",
+                      currency: "COP",
+                    })}
+                  </span>
+                  {venta.metodo_pago && (
+                    <p className="text-xs text-gray-400">
+                      {etiquetaMetodoPago[venta.metodo_pago] ?? venta.metodo_pago}
+                    </p>
+                  )}
+                </div>
               </li>
             );
           })}

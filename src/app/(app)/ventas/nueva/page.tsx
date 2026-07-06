@@ -29,5 +29,16 @@ export default async function NuevaVentaPage() {
     .eq("empresa_id", perfil.empresa_id)
     .order("nombre");
 
-  return <NuevaVentaForm items={items ?? []} />;
+  const { data: empresa } = await supabase
+    .from("empresas")
+    .select("metodos_pago_disponibles")
+    .eq("id", perfil.empresa_id)
+    .single();
+
+  return (
+    <NuevaVentaForm
+      items={items ?? []}
+      metodosPago={empresa?.metodos_pago_disponibles ?? []}
+    />
+  );
 }

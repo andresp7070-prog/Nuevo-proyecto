@@ -30,6 +30,10 @@ create table empresas (
   pagina_entrada text not null default 'ventas'
     check (pagina_entrada in ('ventas','crm','inventario','pyg','insights')),  -- en qué módulo aterriza al iniciar sesión; lo decide el diagnóstico, no el cliente
   fecha_diagnostico date,
+  -- Catálogo fijo de métodos de pago (igual para toda la plataforma); cada
+  -- empresa activa cuáles acepta. Editable por ahora en la tabla de Supabase.
+  metodos_pago_disponibles text[] not null default '{efectivo,tarjeta,transferencia}'
+    check (metodos_pago_disponibles <@ array['efectivo','tarjeta','transferencia','nequi','daviplata','otro']::text[]),
   created_at timestamptz default now()
 );
 
@@ -77,6 +81,8 @@ create table ventas (
   monto numeric(12,2) not null,
   cliente_nombre text,
   producto text,
+  metodo_pago text
+    check (metodo_pago is null or metodo_pago in ('efectivo','tarjeta','transferencia','nequi','daviplata','otro')),
   atributos jsonb default '{}',  -- lo que varía por tipo de negocio: canal de venta, tipo de servicio, etc.
   created_at timestamptz default now()
 );
@@ -661,7 +667,8 @@ create or replace function registrar_venta(
   p_atributos_cliente jsonb,    -- ej. {"placa": "ABC123", "modelo": "Dominar 250"}
   p_atributos_venta jsonb,      -- ej. {"km": 15000}
   p_items jsonb,                 -- ej. [{"item_id":"...","cantidad":1,"precio_unitario":20000,"promocion_id":null,"descuento_aplicado":0}, ...]
-  p_fecha timestamptz default null   -- si la persona cambió la fecha/hora sugerida; null = usar el momento actual
+  p_fecha timestamptz default null,  -- si la persona cambió la fecha/hora sugerida; null = usar el momento actual
+  p_metodo_pago text default null    -- uno de los valores en empresas.metodos_pago_disponibles
 )
 returns uuid
 language plpgsql
@@ -707,8 +714,8 @@ begin
   from jsonb_array_elements(p_items) as item;
 
   -- 3. Crear la venta
-  insert into ventas (empresa_id, monto, contacto_id, cliente_nombre, atributos, fecha)
-  values (p_empresa_id, v_monto_total, v_contacto_id, p_cliente_nombre, p_atributos_venta, coalesce(p_fecha, now()))
+  insert into ventas (empresa_id, monto, contacto_id, cliente_nombre, atributos, fecha, metodo_pago)
+  values (p_empresa_id, v_monto_total, v_contacto_id, p_cliente_nombre, p_atributos_venta, coalesce(p_fecha, now()), p_metodo_pago)
   returning id into v_venta_id;
 
   -- 4. Agregar cada producto o servicio vendido, con su promoción si aplica

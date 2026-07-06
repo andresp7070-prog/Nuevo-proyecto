@@ -13,6 +13,15 @@ type ItemCatalogo = {
   marca: string | null;
 };
 
+const etiquetaMetodoPago: Record<string, string> = {
+  efectivo: "Efectivo",
+  tarjeta: "Tarjeta",
+  transferencia: "Transferencia",
+  nequi: "Nequi",
+  daviplata: "Daviplata",
+  otro: "Otro",
+};
+
 type LineaVenta = {
   key: string;
   itemId: string;
@@ -43,10 +52,17 @@ function filtrarItems(items: ItemCatalogo[], query: string) {
     .slice(0, 8);
 }
 
-export function NuevaVentaForm({ items }: { items: ItemCatalogo[] }) {
+export function NuevaVentaForm({
+  items,
+  metodosPago,
+}: {
+  items: ItemCatalogo[];
+  metodosPago: string[];
+}) {
   const router = useRouter();
 
   const [orden, setOrden] = useState<"cliente-primero" | "productos-primero">("cliente-primero");
+  const [metodoPago, setMetodoPago] = useState(metodosPago[0] ?? "");
 
   const [fecha, setFecha] = useState(ahoraFecha());
   const [hora, setHora] = useState(ahoraHora());
@@ -145,6 +161,10 @@ export function NuevaVentaForm({ items }: { items: ItemCatalogo[] }) {
       setError("El correo es obligatorio y debe ser válido.");
       return;
     }
+    if (!metodoPago) {
+      setError("Selecciona un método de pago.");
+      return;
+    }
 
     setGuardando(true);
     try {
@@ -155,6 +175,7 @@ export function NuevaVentaForm({ items }: { items: ItemCatalogo[] }) {
         clienteTelefono: telefono.trim(),
         clienteEmail: email.trim(),
         fecha: fechaHora,
+        metodoPago,
         items: lineasValidas.map((linea) => ({
           itemId: linea.itemId,
           cantidad: linea.cantidad,
@@ -355,7 +376,7 @@ export function NuevaVentaForm({ items }: { items: ItemCatalogo[] }) {
         </button>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+      <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Fecha</label>
           <input
@@ -373,6 +394,21 @@ export function NuevaVentaForm({ items }: { items: ItemCatalogo[] }) {
             onChange={(e) => setHora(e.target.value)}
             className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Método de pago *</label>
+          <select
+            value={metodoPago}
+            onChange={(e) => setMetodoPago(e.target.value)}
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          >
+            {metodosPago.length === 0 && <option value="">Sin métodos configurados</option>}
+            {metodosPago.map((valor) => (
+              <option key={valor} value={valor}>
+                {etiquetaMetodoPago[valor] ?? valor}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
