@@ -555,14 +555,18 @@ alter table finanzas_movimientos enable row level security;
 alter table pasivos enable row level security;
 alter table promociones enable row level security;
 
--- Funciones auxiliares, para no repetir la misma subconsulta en cada política
+-- Funciones auxiliares, para no repetir la misma subconsulta en cada política.
+-- security definer es necesario aquí: la política de "perfiles" usa es_admin(),
+-- que a su vez consulta "perfiles" — sin security definer, Postgres tendría que
+-- re-evaluar esa misma política para resolver la función, entrando en un ciclo
+-- que termina en error ("infinite recursion detected in policy for relation").
 create or replace function mi_empresa_id()
-returns uuid language sql stable as $$
+returns uuid language sql stable security definer set search_path = public as $$
   select empresa_id from perfiles where id = auth.uid();
 $$;
 
 create or replace function es_admin()
-returns boolean language sql stable as $$
+returns boolean language sql stable security definer set search_path = public as $$
   select rol = 'admin' from perfiles where id = auth.uid();
 $$;
 
