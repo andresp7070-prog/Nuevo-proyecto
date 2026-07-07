@@ -54,7 +54,7 @@ export function DirectorioRecetas({ items }: { items: Item[] }) {
           placeholder="Ej. Hamburguesa"
           className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
         />
-        {mostrarSugerencias && sugerencias.length > 0 && (
+        {mostrarSugerencias && busqueda.trim() && (
           <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
             {sugerencias.map((item) => (
               <li key={item.id}>
@@ -69,6 +69,14 @@ export function DirectorioRecetas({ items }: { items: Item[] }) {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link
+                href={`/inventario/nuevo?nombre=${encodeURIComponent(busqueda.trim())}&volver=receta`}
+                className="block border-t border-gray-100 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                + Crear &ldquo;{busqueda.trim()}&rdquo; como producto nuevo
+              </Link>
+            </li>
           </ul>
         )}
       </div>

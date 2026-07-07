@@ -26,17 +26,23 @@ export async function crearProducto(input: {
     throw new Error("Tu usuario no tiene una empresa asignada.");
   }
 
-  const { error } = await supabase.from("inventario_items").insert({
-    empresa_id: perfil.empresa_id,
-    nombre: input.nombre,
-    categoria: input.categoria || null,
-    unidad: input.unidad,
-    cantidad: input.cantidad,
-    costo: input.costo,
-    precio_venta: input.precioVenta,
-  });
+  const { data, error } = await supabase
+    .from("inventario_items")
+    .insert({
+      empresa_id: perfil.empresa_id,
+      nombre: input.nombre,
+      categoria: input.categoria || null,
+      unidad: input.unidad,
+      cantidad: input.cantidad,
+      costo: input.costo,
+      precio_venta: input.precioVenta,
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  return { id: data.id as string };
 }
 
 export async function reabastecerProducto(input: {
