@@ -15,6 +15,7 @@ type Item = {
   costo: number | null;
   precio_venta: number | null;
   marca: string | null;
+  disponible: number | null;
 };
 
 function formatoMoneda(valor: number | null) {
@@ -86,9 +87,18 @@ export function DirectorioInventario({
                 </div>
                 <div className="flex items-center gap-6 text-right text-sm">
                   <div>
-                    <p className="text-xs text-gray-400">Cantidad</p>
-                    <p className="font-medium text-gray-900">
-                      {item.cantidad} {etiquetaUnidad(item.unidad)}
+                    <p className="text-xs text-gray-400">
+                      {item.disponible !== null ? "Disponible" : "Cantidad"}
+                    </p>
+                    <p
+                      className={`font-medium ${
+                        item.disponible !== null && item.disponible <= 0
+                          ? "text-red-600"
+                          : "text-gray-900"
+                      }`}
+                    >
+                      {item.disponible !== null ? item.disponible : item.cantidad}{" "}
+                      {etiquetaUnidad(item.unidad)}
                     </p>
                   </div>
                   <div>

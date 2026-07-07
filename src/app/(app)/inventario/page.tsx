@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { calcularMaxProducible } from "@/lib/inventario";
 import { DirectorioInventario } from "./directorio-inventario";
 
 export default async function InventarioPage({
@@ -35,5 +36,37 @@ export default async function InventarioPage({
     .eq("empresa_id", perfil.empresa_id)
     .order("nombre");
 
-  return <DirectorioInventario items={items ?? []} creado={creado === "1"} />;
+  const itemIds = (items ?? []).map((item) => item.id);
+
+  type RecetaFila = {
+    item_resultante_id: string;
+    cantidad_insumo: number;
+    inventario_items: { cantidad: number } | null;
+  };
+
+  const { data: recetaRowsRaw } =
+    itemIds.length > 0
+      ? await supabase
+          .from("inventario_receta")
+          .select(
+            "item_resultante_id, cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( cantidad )",
+          )
+          .in("item_resultante_id", itemIds)
+      : { data: [] };
+
+  const recetaRows = (recetaRowsRaw ?? []) as unknown as RecetaFila[];
+
+  const recetaPorItem: Record<string, { cantidadInsumo: number; stockInsumo: number }[]> = {};
+  for (const fila of recetaRows) {
+    const lista = recetaPorItem[fila.item_resultante_id] ?? [];
+    lista.push({ cantidadInsumo: fila.cantidad_insumo, stockInsumo: fila.inventario_items?.cantidad ?? 0 });
+    recetaPorItem[fila.item_resultante_id] = lista;
+  }
+
+  const itemsConDisponible = (items ?? []).map((item) => ({
+    ...item,
+    disponible: calcularMaxProducible(recetaPorItem[item.id] ?? []),
+  }));
+
+  return <DirectorioInventario items={itemsConDisponible} creado={creado === "1"} />;
 }
