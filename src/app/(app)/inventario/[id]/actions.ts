@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { reemplazarReceta } from "@/lib/inventario";
 
 export async function guardarReceta(input: {
   itemResultanteId: string;
@@ -12,24 +13,7 @@ export async function guardarReceta(input: {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("No hay sesión activa.");
 
-  const { error: errorBorrar } = await supabase
-    .from("inventario_receta")
-    .delete()
-    .eq("item_resultante_id", input.itemResultanteId);
-
-  if (errorBorrar) throw new Error(errorBorrar.message);
-
-  if (input.lineas.length === 0) return;
-
-  const { error: errorInsertar } = await supabase.from("inventario_receta").insert(
-    input.lineas.map((linea) => ({
-      item_resultante_id: input.itemResultanteId,
-      item_insumo_id: linea.insumoId,
-      cantidad_insumo: linea.cantidad,
-    })),
-  );
-
-  if (errorInsertar) throw new Error(errorInsertar.message);
+  await reemplazarReceta(supabase, input.itemResultanteId, input.lineas);
 }
 
 export async function registrarProduccion(input: {
