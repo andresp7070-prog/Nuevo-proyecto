@@ -79,7 +79,7 @@ export default async function FichaProductoPage({
               href={`/inventario/${item.id}/producir`}
               className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
             >
-              Producir
+              Guardar
             </Link>
           </div>
         </div>
@@ -106,7 +106,7 @@ export default async function FichaProductoPage({
         <h2 className="mb-4 text-sm font-semibold text-gray-900">Receta</h2>
         {receta.length === 0 ? (
           <p className="text-sm text-gray-400">
-            Este producto no tiene receta configurada — &ldquo;Producir&rdquo; solo sumará al
+            Este producto no tiene receta configurada — &ldquo;Guardar&rdquo; solo sumará al
             stock, sin descontar insumos.
           </p>
         ) : (
