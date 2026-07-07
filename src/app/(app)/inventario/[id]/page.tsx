@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import { etiquetaUnidad } from "@/lib/unidades";
 
 type RecetaFila = {
   cantidad_insumo: number;
@@ -70,7 +71,7 @@ export default async function FichaProductoPage({
           <div>
             <p className="text-gray-400">Cantidad en stock</p>
             <p className="font-medium text-gray-900">
-              {item.cantidad} {item.unidad}
+              {item.cantidad} {etiquetaUnidad(item.unidad)}
             </p>
           </div>
           <div>
@@ -95,7 +96,8 @@ export default async function FichaProductoPage({
           <ul className="divide-y divide-gray-200">
             {receta.map((fila, i) => (
               <li key={i} className="py-2 text-sm text-gray-900">
-                {fila.cantidad_insumo} {fila.inventario_items?.unidad} de{" "}
+                {fila.cantidad_insumo}{" "}
+                {fila.inventario_items ? etiquetaUnidad(fila.inventario_items.unidad) : ""} de{" "}
                 {fila.inventario_items?.nombre}
               </li>
             ))}

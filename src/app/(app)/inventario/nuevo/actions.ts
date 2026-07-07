@@ -8,6 +8,7 @@ type LineaReceta = { insumoId: string; cantidad: number };
 export async function crearProducto(input: {
   nombre: string;
   categoria: string;
+  unidad: string;
   cantidad: number;
   costo: number;
   precioVenta: number;
@@ -35,6 +36,7 @@ export async function crearProducto(input: {
       empresa_id: perfil.empresa_id,
       nombre: input.nombre,
       categoria: input.categoria || null,
+      unidad: input.unidad,
       cantidad: input.cantidad,
       costo: input.costo,
       precio_venta: input.precioVenta,

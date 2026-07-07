@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { sinTildes } from "@/lib/texto";
+import { etiquetaUnidad } from "@/lib/unidades";
 
 type Item = {
   id: string;
   nombre: string;
   categoria: string | null;
+  unidad: string;
   cantidad: number;
   costo: number | null;
   precio_venta: number | null;
@@ -82,7 +84,9 @@ export function DirectorioInventario({
                 <div className="flex items-center gap-6 text-right text-sm">
                   <div>
                     <p className="text-xs text-gray-400">Cantidad</p>
-                    <p className="font-medium text-gray-900">{item.cantidad}</p>
+                    <p className="font-medium text-gray-900">
+                      {item.cantidad} {etiquetaUnidad(item.unidad)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Costo</p>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { sinTildes } from "@/lib/texto";
+import { UNIDADES, unidadesDeLaMismaDimension, convertir } from "@/lib/unidades";
 
 export type Insumo = {
   id: string;
@@ -17,6 +18,7 @@ type Linea = {
   busqueda: string;
   mostrarSugerencias: boolean;
   cantidad: string;
+  unidadEntrada: string; // unidad en la que la persona está escribiendo la cantidad
 };
 
 function nuevaLinea(): Linea {
@@ -26,6 +28,7 @@ function nuevaLinea(): Linea {
     busqueda: "",
     mostrarSugerencias: false,
     cantidad: "",
+    unidadEntrada: "",
   };
 }
 
@@ -35,10 +38,31 @@ function filtrarInsumos(insumos: Insumo[], query: string) {
   return insumos.filter((insumo) => sinTildes(insumo.nombre).includes(q)).slice(0, 8);
 }
 
-function lineasValidas(lineas: Linea[]): LineaRecetaValor[] {
+// Convierte la cantidad escrita (en unidadEntrada) a la unidad propia del
+// insumo. Si no se puede convertir (unidad desconocida o dimensión
+// distinta), usa el número tal cual, igual que antes de tener conversión.
+function cantidadEnUnidadDelInsumo(cantidad: number, unidadEntrada: string, unidadInsumo: string) {
+  if (!unidadEntrada || unidadEntrada === unidadInsumo) return cantidad;
+  try {
+    return convertir(cantidad, unidadEntrada, unidadInsumo);
+  } catch {
+    return cantidad;
+  }
+}
+
+function lineasValidas(lineas: Linea[], insumosDisponibles: Insumo[]): LineaRecetaValor[] {
   return lineas
     .filter((linea) => linea.insumoId && linea.cantidad.trim() && Number(linea.cantidad) > 0)
-    .map((linea) => ({ insumoId: linea.insumoId, cantidad: Number(linea.cantidad) }));
+    .map((linea) => {
+      const insumo = insumosDisponibles.find((i) => i.id === linea.insumoId);
+      const cantidadNum = Number(linea.cantidad);
+      return {
+        insumoId: linea.insumoId,
+        cantidad: insumo
+          ? cantidadEnUnidadDelInsumo(cantidadNum, linea.unidadEntrada, insumo.unidad)
+          : cantidadNum,
+      };
+    });
 }
 
 function lineasIniciales(valores: LineaRecetaValor[], insumosDisponibles: Insumo[]): Linea[] {
@@ -50,6 +74,7 @@ function lineasIniciales(valores: LineaRecetaValor[], insumosDisponibles: Insumo
       busqueda: insumo?.nombre ?? "",
       mostrarSugerencias: false,
       cantidad: String(fila.cantidad),
+      unidadEntrada: insumo?.unidad ?? "",
     };
   });
   return iniciales.length > 0 ? iniciales : [nuevaLinea()];
@@ -70,7 +95,7 @@ export function RecetaLineas({
 
   function aplicar(nuevas: Linea[]) {
     setLineas(nuevas);
-    onChange(lineasValidas(nuevas));
+    onChange(lineasValidas(nuevas, insumosDisponibles));
   }
 
   function actualizarLinea(key: string, cambios: Partial<Linea>) {
@@ -78,13 +103,19 @@ export function RecetaLineas({
   }
 
   function buscarInsumo(key: string, texto: string) {
-    actualizarLinea(key, { busqueda: texto, insumoId: "", mostrarSugerencias: true });
+    actualizarLinea(key, {
+      busqueda: texto,
+      insumoId: "",
+      unidadEntrada: "",
+      mostrarSugerencias: true,
+    });
   }
 
   function seleccionarInsumo(key: string, insumo: Insumo) {
     actualizarLinea(key, {
       insumoId: insumo.id,
       busqueda: insumo.nombre,
+      unidadEntrada: insumo.unidad,
       mostrarSugerencias: false,
     });
   }
@@ -102,9 +133,14 @@ export function RecetaLineas({
       <div className="space-y-3">
         {lineas.map((linea) => {
           const insumoSeleccionado = insumosDisponibles.find((i) => i.id === linea.insumoId);
+          const unidadesCompatibles = insumoSeleccionado
+            ? unidadesDeLaMismaDimension(insumoSeleccionado.unidad)
+            : [];
+          const puedeElegirUnidad = unidadesCompatibles.length > 1;
+
           return (
             <div key={linea.key} className="grid grid-cols-12 items-end gap-2">
-              <div className="relative col-span-7">
+              <div className="relative col-span-5">
                 <label className="mb-1 block text-xs font-medium text-gray-700">Insumo</label>
                 <input
                   value={linea.busqueda}
@@ -137,10 +173,8 @@ export function RecetaLineas({
                     </ul>
                   )}
               </div>
-              <div className="col-span-4">
-                <label className="mb-1 block text-xs font-medium text-gray-700">
-                  Cantidad {insumoSeleccionado ? `(${insumoSeleccionado.unidad})` : ""}
-                </label>
+              <div className="col-span-3">
+                <label className="mb-1 block text-xs font-medium text-gray-700">Cantidad</label>
                 <input
                   type="number"
                   min={0}
@@ -148,6 +182,33 @@ export function RecetaLineas({
                   onChange={(e) => actualizarLinea(linea.key, { cantidad: e.target.value })}
                   className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                 />
+              </div>
+              <div className="col-span-3">
+                <label className="mb-1 block text-xs font-medium text-gray-700">Unidad</label>
+                {puedeElegirUnidad ? (
+                  <select
+                    value={linea.unidadEntrada}
+                    onChange={(e) => actualizarLinea(linea.key, { unidadEntrada: e.target.value })}
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                  >
+                    {unidadesCompatibles.map((u) => (
+                      <option key={u.valor} value={u.valor}>
+                        {u.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={
+                      insumoSeleccionado
+                        ? UNIDADES.find((u) => u.valor === insumoSeleccionado.unidad)?.etiqueta ??
+                          insumoSeleccionado.unidad
+                        : ""
+                    }
+                    disabled
+                    className="w-full rounded border border-gray-200 bg-gray-50 px-2 py-2 text-sm text-gray-500"
+                  />
+                )}
               </div>
               <div className="col-span-1 flex justify-end">
                 <button

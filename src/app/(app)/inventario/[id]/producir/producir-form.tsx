@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { etiquetaUnidad } from "@/lib/unidades";
 import { registrarProduccion } from "../actions";
 
 type RecetaFila = {
@@ -50,7 +51,7 @@ export function ProducirForm({
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
-          Cantidad producida ({item.unidad}) *
+          Cantidad producida ({etiquetaUnidad(item.unidad)}) *
         </label>
         <input
           type="number"
@@ -73,7 +74,8 @@ export function ProducirForm({
             {receta.map((fila, i) => (
               <li key={i}>
                 {(fila.cantidad_insumo * cantidadNum).toLocaleString("es-CO")}{" "}
-                {fila.inventario_items?.unidad} de {fila.inventario_items?.nombre}
+                {fila.inventario_items ? etiquetaUnidad(fila.inventario_items.unidad) : ""} de{" "}
+                {fila.inventario_items?.nombre}
               </li>
             ))}
           </ul>

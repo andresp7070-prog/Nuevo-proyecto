@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { sinTildes } from "@/lib/texto";
+import { UNIDADES } from "@/lib/unidades";
 import { CampoMoneda } from "@/components/campo-moneda";
 import { RecetaLineas, type LineaRecetaValor } from "../receta-lineas";
 import { crearProducto, reabastecerProducto } from "./actions";
@@ -43,6 +44,7 @@ export function NuevoProductoForm({
   const [categoria, setCategoria] = useState("");
   const [mostrarSugerenciasCategoria, setMostrarSugerenciasCategoria] = useState(false);
 
+  const [unidad, setUnidad] = useState("unidad");
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
@@ -124,6 +126,7 @@ export function NuevoProductoForm({
         await crearProducto({
           nombre: nombre.trim(),
           categoria: categoria.trim(),
+          unidad,
           cantidad: cantidadNum,
           costo: costoNum,
           precioVenta: precioVentaNum,
@@ -213,8 +216,40 @@ export function NuevoProductoForm({
           </div>
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Unidad *</label>
+            {itemExistente ? (
+              <input
+                value={UNIDADES.find((u) => u.valor === itemExistente.unidad)?.etiqueta ?? itemExistente.unidad}
+                disabled
+                className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+              />
+            ) : (
+              <select
+                value={unidad}
+                onChange={(e) => setUnidad(e.target.value)}
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              >
+                {UNIDADES.map((u) => (
+                  <option key={u.valor} value={u.valor}>
+                    {u.etiqueta}
+                  </option>
+                ))}
+              </select>
+            )}
+            {itemExistente && (
+              <p className="mt-1 text-xs text-gray-400">
+                La unidad de un producto ya existente no se puede cambiar.
+              </p>
+            )}
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              {itemExistente ? "Cantidad a agregar *" : "Cantidad *"}
+              {itemExistente ? "Cantidad a agregar *" : "Cantidad *"} (
+              {itemExistente
+                ? UNIDADES.find((u) => u.valor === itemExistente.unidad)?.etiqueta
+                : UNIDADES.find((u) => u.valor === unidad)?.etiqueta}
+              )
             </label>
             <input
               type="number"
