@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
+import { calcularMaxProducible } from "@/lib/inventario";
 import { ProducirForm } from "./producir-form";
 
 type RecetaFila = {
   cantidad_insumo: number;
-  inventario_items: { nombre: string; unidad: string } | null;
+  inventario_items: { nombre: string; unidad: string; cantidad: number } | null;
 };
 
 export default async function ProducirPage({
@@ -30,10 +31,19 @@ export default async function ProducirPage({
 
   const { data } = await supabase
     .from("inventario_receta")
-    .select("cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( nombre, unidad )")
+    .select(
+      "cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( nombre, unidad, cantidad )",
+    )
     .eq("item_resultante_id", id);
 
   const receta = (data ?? []) as unknown as RecetaFila[];
 
-  return <ProducirForm item={item} receta={receta} />;
+  const maxProducible = calcularMaxProducible(
+    receta.map((fila) => ({
+      cantidadInsumo: fila.cantidad_insumo,
+      stockInsumo: fila.inventario_items?.cantidad ?? 0,
+    })),
+  );
+
+  return <ProducirForm item={item} receta={receta} maxProducible={maxProducible} />;
 }

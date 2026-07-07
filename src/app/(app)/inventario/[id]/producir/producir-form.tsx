@@ -13,22 +13,33 @@ type RecetaFila = {
 export function ProducirForm({
   item,
   receta,
+  maxProducible,
 }: {
   item: { id: string; nombre: string; unidad: string };
   receta: RecetaFila[];
+  maxProducible: number | null;
 }) {
   const router = useRouter();
-  const [cantidad, setCantidad] = useState("");
+  const [cantidad, setCantidad] = useState(
+    maxProducible !== null && maxProducible > 0 ? String(maxProducible) : "",
+  );
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const cantidadNum = Number(cantidad) || 0;
+  const sinInsumosSuficientes = maxProducible !== null && maxProducible <= 0;
 
   async function guardar() {
     setError(null);
 
     if (cantidad.trim() === "" || Number.isNaN(cantidadNum) || cantidadNum <= 0) {
       setError("Escribe cuántas unidades vas a producir (mayor a cero).");
+      return;
+    }
+    if (maxProducible !== null && cantidadNum > maxProducible) {
+      setError(
+        `No hay insumos suficientes. Con tu inventario actual solo puedes producir hasta ${maxProducible}.`,
+      );
       return;
     }
 
@@ -49,6 +60,18 @@ export function ProducirForm({
         <span className="font-medium text-gray-700">{item.nombre}</span>
       </p>
 
+      {maxProducible !== null && (
+        <p
+          className={`mb-4 rounded px-3 py-2 text-sm ${
+            sinInsumosSuficientes ? "bg-red-50 text-red-700" : "bg-gray-50 text-gray-600"
+          }`}
+        >
+          {sinInsumosSuficientes
+            ? "No tienes insumos suficientes para producir ni una unidad."
+            : `Con tu inventario actual de insumos puedes producir hasta ${maxProducible} unidades.`}
+        </p>
+      )}
+
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
           Cantidad producida ({etiquetaUnidad(item.unidad)}) *
@@ -56,9 +79,11 @@ export function ProducirForm({
         <input
           type="number"
           min={0}
+          max={maxProducible ?? undefined}
           value={cantidad}
           onChange={(e) => setCantidad(e.target.value)}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          disabled={sinInsumosSuficientes}
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none disabled:bg-gray-50"
         />
       </div>
 
@@ -87,7 +112,7 @@ export function ProducirForm({
       <button
         type="button"
         onClick={guardar}
-        disabled={guardando}
+        disabled={guardando || sinInsumosSuficientes}
         className="mt-6 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {guardando ? "Guardando..." : "Registrar producción"}
