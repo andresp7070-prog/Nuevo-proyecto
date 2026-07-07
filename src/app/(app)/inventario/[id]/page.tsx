@@ -28,7 +28,9 @@ export default async function FichaProductoPage({
 
   const { data: item } = await supabase
     .from("inventario_items")
-    .select("id, nombre, categoria, unidad, cantidad, costo, precio_venta, marca:atributos->>marca")
+    .select(
+      "id, nombre, categoria, unidad, cantidad, costo, precio_venta, marca:atributos->>marca, contenido_por_unidad:atributos->>contenido_por_unidad",
+    )
     .eq("id", id)
     .single();
 
@@ -50,6 +52,11 @@ export default async function FichaProductoPage({
             <p className="text-sm text-gray-500">
               {[item.categoria, item.marca].filter(Boolean).join(" · ") || "Sin categoría"}
             </p>
+            {item.contenido_por_unidad && (
+              <p className="mt-1 text-xs text-gray-400">
+                Cada unidad: {item.contenido_por_unidad} {etiquetaUnidad(item.unidad)}
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <Link

@@ -52,6 +52,7 @@ export function NuevoProductoForm({
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
+  const [contenidoPorUnidad, setContenidoPorUnidad] = useState("");
   const [receta, setReceta] = useState<LineaRecetaValor[]>([]);
 
   const insumosDisponibles = items
@@ -62,6 +63,11 @@ export function NuevoProductoForm({
     const insumo = items.find((item) => item.id === linea.insumoId);
     return total + linea.cantidad * (insumo?.costo ?? 0);
   }, 0);
+
+  const precioVentaEstimado = Number(precioVenta) || 0;
+  const gananciaUnitaria = precioVentaEstimado - costoCalculado;
+  const margenPorcentaje =
+    precioVentaEstimado > 0 ? (gananciaUnitaria / precioVentaEstimado) * 100 : null;
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +116,7 @@ export function NuevoProductoForm({
     setCantidad("");
     setCosto("");
     setPrecioVenta("");
+    setContenidoPorUnidad("");
   }
 
   async function guardar() {
@@ -177,6 +184,10 @@ export function NuevoProductoForm({
           cantidad: cantidadNum,
           costo: costoNum,
           precioVenta: precioVentaNum,
+          atributos:
+            volverAReceta && unidad !== "unidad" && contenidoPorUnidad.trim()
+              ? { contenido_por_unidad: Number(contenidoPorUnidad) }
+              : undefined,
         });
         if (volverAReceta) {
           if (receta.length > 0) {
@@ -300,6 +311,28 @@ export function NuevoProductoForm({
     </div>
   );
 
+  const campoContenido =
+    volverAReceta && !itemExistente && unidad !== "unidad" ? (
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Contenido por unidad (opcional)
+        </label>
+        <input
+          type="number"
+          min={0}
+          value={contenidoPorUnidad}
+          onChange={(e) => setContenidoPorUnidad(e.target.value)}
+          placeholder="Ej. 500"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          ¿Cuánto trae cada unidad? Ej. si cada una son 500{" "}
+          {UNIDADES.find((u) => u.valor === unidad)?.etiqueta}, escribe 500. Queda guardado como
+          referencia.
+        </p>
+      </div>
+    ) : null;
+
   const campoCantidad = volverAReceta ? (
     <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
       La cantidad inicial es 0. Después de guardar, usa &ldquo;Producir&rdquo; para armar
@@ -348,13 +381,21 @@ export function NuevoProductoForm({
   );
 
   const campoPrecioVenta = (
-    <CampoMoneda
-      id="precioVenta"
-      label={volverAReceta ? "Precio de venta estimado" : "Precio de venta"}
-      required
-      value={precioVenta}
-      onChange={setPrecioVenta}
-    />
+    <div>
+      <CampoMoneda
+        id="precioVenta"
+        label={volverAReceta ? "Precio de venta estimado" : "Precio de venta"}
+        required
+        value={precioVenta}
+        onChange={setPrecioVenta}
+      />
+      {volverAReceta && margenPorcentaje !== null && (
+        <p className={`mt-1 text-xs ${gananciaUnitaria >= 0 ? "text-green-600" : "text-red-600"}`}>
+          Ganancia: {gananciaUnitaria.toLocaleString("es-CO", { style: "currency", currency: "COP" })}{" "}
+          por unidad ({margenPorcentaje.toFixed(1)}% de margen)
+        </p>
+      )}
+    </div>
   );
 
   const panelReceta = (
@@ -411,6 +452,7 @@ export function NuevoProductoForm({
             {campoNombre}
             {campoCategoria}
             {campoUnidad}
+            {campoContenido}
             {campoCantidad}
             <p className="text-xs text-gray-400">* Campos obligatorios</p>
           </div>

@@ -9,6 +9,7 @@ export async function crearProducto(input: {
   cantidad: number;
   costo: number;
   precioVenta: number;
+  atributos?: Record<string, unknown>;
 }) {
   const supabase = await createClient();
   const {
@@ -36,6 +37,7 @@ export async function crearProducto(input: {
       cantidad: input.cantidad,
       costo: input.costo,
       precio_venta: input.precioVenta,
+      atributos: input.atributos ?? {},
     })
     .select("id")
     .single();
