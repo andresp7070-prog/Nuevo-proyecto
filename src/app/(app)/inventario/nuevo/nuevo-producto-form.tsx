@@ -24,14 +24,22 @@ function filtrar(valores: string[], query: string) {
   return valores.filter((valor) => sinTildes(valor).includes(q)).slice(0, 8);
 }
 
-export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
+export function NuevoProductoForm({
+  items,
+  nombreInicial = "",
+  volverAReceta = false,
+}: {
+  items: ItemExistente[];
+  nombreInicial?: string;
+  volverAReceta?: boolean;
+}) {
   const router = useRouter();
 
   const categoriasExistentes = Array.from(
     new Set(items.map((item) => item.categoria).filter((valor): valor is string => Boolean(valor))),
   );
 
-  const [nombre, setNombre] = useState("");
+  const [nombre, setNombre] = useState(nombreInicial);
   const [mostrarSugerenciasNombre, setMostrarSugerenciasNombre] = useState(false);
   const [itemExistente, setItemExistente] = useState<ItemExistente | null>(null);
 
@@ -140,8 +148,10 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
           precioVenta: precioVentaNum,
         });
         setMensajeExito(`"${nombreFinal}" reabastecido correctamente.`);
+        reiniciarFormulario();
+        router.refresh();
       } else {
-        await crearProducto({
+        const { id } = await crearProducto({
           nombre: nombreFinal,
           categoria: categoriaFinal,
           unidad,
@@ -149,10 +159,14 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
           costo: costoNum,
           precioVenta: precioVentaNum,
         });
+        if (volverAReceta) {
+          router.push(`/inventario/${id}/receta`);
+          return;
+        }
         setMensajeExito(`"${nombreFinal}" creado correctamente.`);
+        reiniciarFormulario();
+        router.refresh();
       }
-      reiniciarFormulario();
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar el producto.");
     } finally {
@@ -164,10 +178,19 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Agregar producto</h1>
-        <Link href="/inventario" className="text-sm text-gray-500 hover:text-gray-700">
-          Ver inventario
+        <Link
+          href={volverAReceta ? "/inventario/recetas" : "/inventario"}
+          className="text-sm text-gray-500 hover:text-gray-700"
+        >
+          {volverAReceta ? "Volver a recetas" : "Ver inventario"}
         </Link>
       </div>
+
+      {volverAReceta && (
+        <p className="mb-4 rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+          Al guardar, te llevamos directo a configurar la receta de este producto.
+        </p>
+      )}
 
       {mensajeExito && (
         <p className="mb-4 rounded bg-green-50 px-3 py-2 text-sm text-green-700">

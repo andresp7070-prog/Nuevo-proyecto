@@ -2,7 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { NuevoProductoForm } from "./nuevo-producto-form";
 
-export default async function NuevoProductoPage() {
+export default async function NuevoProductoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ nombre?: string; volver?: string }>;
+}) {
+  const { nombre, volver } = await searchParams;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -29,5 +35,11 @@ export default async function NuevoProductoPage() {
     .eq("empresa_id", perfil.empresa_id)
     .order("nombre");
 
-  return <NuevoProductoForm items={items ?? []} />;
+  return (
+    <NuevoProductoForm
+      items={items ?? []}
+      nombreInicial={nombre ?? ""}
+      volverAReceta={volver === "receta"}
+    />
+  );
 }
