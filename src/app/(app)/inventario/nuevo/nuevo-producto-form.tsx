@@ -6,6 +6,8 @@ import Link from "next/link";
 import { sinTildes, primeraMayuscula } from "@/lib/texto";
 import { UNIDADES } from "@/lib/unidades";
 import { CampoMoneda } from "@/components/campo-moneda";
+import { RecetaLineas, type LineaRecetaValor } from "../receta-lineas";
+import { guardarReceta } from "../[id]/actions";
 import { crearProducto, reabastecerProducto } from "./actions";
 
 type ItemExistente = {
@@ -50,6 +52,11 @@ export function NuevoProductoForm({
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
+  const [receta, setReceta] = useState<LineaRecetaValor[]>([]);
+
+  const insumosDisponibles = items
+    .filter((item) => item.id !== itemExistente?.id)
+    .map((item) => ({ id: item.id, nombre: item.nombre, unidad: item.unidad }));
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,6 +154,13 @@ export function NuevoProductoForm({
           costo: costoNum,
           precioVenta: precioVentaNum,
         });
+        if (volverAReceta) {
+          if (receta.length > 0) {
+            await guardarReceta({ itemResultanteId: itemExistente.id, lineas: receta });
+          }
+          router.push(`/inventario/${itemExistente.id}`);
+          return;
+        }
         setMensajeExito(`"${nombreFinal}" reabastecido correctamente.`);
         reiniciarFormulario();
         router.refresh();
@@ -160,7 +174,10 @@ export function NuevoProductoForm({
           precioVenta: precioVentaNum,
         });
         if (volverAReceta) {
-          router.push(`/inventario/${id}/receta`);
+          if (receta.length > 0) {
+            await guardarReceta({ itemResultanteId: id, lineas: receta });
+          }
+          router.push(`/inventario/${id}`);
           return;
         }
         setMensajeExito(`"${nombreFinal}" creado correctamente.`);
@@ -188,7 +205,8 @@ export function NuevoProductoForm({
 
       {volverAReceta && (
         <p className="mb-4 rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
-          Al guardar, te llevamos directo a configurar la receta de este producto.
+          Como este producto se arma combinando otros, también elige aquí abajo de qué insumos
+          se compone.
         </p>
       )}
 
@@ -339,6 +357,16 @@ export function NuevoProductoForm({
 
         <p className="text-xs text-gray-400">* Campos obligatorios</p>
       </div>
+
+      {volverAReceta && (
+        <div className="mt-6 max-w-2xl rounded-lg border border-gray-200 p-4">
+          <h2 className="mb-1 text-sm font-semibold text-gray-900">Receta</h2>
+          <p className="mb-4 text-xs text-gray-400">
+            Insumos que se descuentan automáticamente al producir una unidad de este producto.
+          </p>
+          <RecetaLineas insumosDisponibles={insumosDisponibles} onChange={setReceta} />
+        </div>
+      )}
 
       <button
         type="button"
