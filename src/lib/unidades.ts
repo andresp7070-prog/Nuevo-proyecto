@@ -8,7 +8,7 @@ export type Unidad = {
 };
 
 export const UNIDADES: Unidad[] = [
-  { valor: "unidad", etiqueta: "No aplica", dimension: "conteo", factor: 1 },
+  { valor: "unidad", etiqueta: "Unidades", dimension: "conteo", factor: 1 },
   { valor: "gramo", etiqueta: "Gramo (g)", dimension: "peso", factor: 1 },
   { valor: "kilogramo", etiqueta: "Kilogramo (kg)", dimension: "peso", factor: 1000 },
   { valor: "libra", etiqueta: "Libra (lb)", dimension: "peso", factor: 453.592 },

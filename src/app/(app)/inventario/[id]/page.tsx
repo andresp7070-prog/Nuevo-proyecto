@@ -2,10 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { etiquetaUnidad } from "@/lib/unidades";
+import { calcularMaxProducible } from "@/lib/inventario";
 
 type RecetaFila = {
   cantidad_insumo: number;
-  inventario_items: { nombre: string; unidad: string } | null;
+  inventario_items: { nombre: string; unidad: string; cantidad: number } | null;
 };
 
 function formatoMoneda(valor: number | null) {
@@ -38,10 +39,19 @@ export default async function FichaProductoPage({
 
   const { data } = await supabase
     .from("inventario_receta")
-    .select("cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( nombre, unidad )")
+    .select(
+      "cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( nombre, unidad, cantidad )",
+    )
     .eq("item_resultante_id", id);
 
   const receta = (data ?? []) as unknown as RecetaFila[];
+
+  const maxProducible = calcularMaxProducible(
+    receta.map((fila) => ({
+      cantidadInsumo: fila.cantidad_insumo,
+      stockInsumo: fila.inventario_items?.cantidad ?? 0,
+    })),
+  );
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -100,15 +110,26 @@ export default async function FichaProductoPage({
             stock, sin descontar insumos.
           </p>
         ) : (
-          <ul className="divide-y divide-gray-200">
-            {receta.map((fila, i) => (
-              <li key={i} className="py-2 text-sm text-gray-900">
-                {fila.cantidad_insumo}{" "}
-                {fila.inventario_items ? etiquetaUnidad(fila.inventario_items.unidad) : ""} de{" "}
-                {fila.inventario_items?.nombre}
-              </li>
-            ))}
-          </ul>
+          <>
+            <p
+              className={`mb-3 text-sm font-medium ${
+                maxProducible !== null && maxProducible <= 0 ? "text-red-600" : "text-gray-700"
+              }`}
+            >
+              {maxProducible !== null && maxProducible <= 0
+                ? "No hay insumos suficientes para producir ni una unidad."
+                : `Con el inventario actual de insumos se pueden producir hasta ${maxProducible} unidades.`}
+            </p>
+            <ul className="divide-y divide-gray-200">
+              {receta.map((fila, i) => (
+                <li key={i} className="py-2 text-sm text-gray-900">
+                  {fila.cantidad_insumo}{" "}
+                  {fila.inventario_items ? etiquetaUnidad(fila.inventario_items.unidad) : ""} de{" "}
+                  {fila.inventario_items?.nombre}
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </div>

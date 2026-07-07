@@ -26,3 +26,17 @@ export async function reemplazarReceta(
 
   if (errorInsertar) throw new Error(errorInsertar.message);
 }
+
+// Cuántas unidades del producto resultante se pueden armar ahora mismo,
+// según el stock disponible de cada insumo y cuánto pide la receta de cada
+// uno — el insumo más escaso es el que manda. null = sin receta, sin límite.
+export function calcularMaxProducible(
+  receta: { cantidadInsumo: number; stockInsumo: number }[],
+): number | null {
+  if (receta.length === 0) return null;
+  const posibles = receta
+    .filter((fila) => fila.cantidadInsumo > 0)
+    .map((fila) => Math.floor(fila.stockInsumo / fila.cantidadInsumo));
+  if (posibles.length === 0) return null;
+  return Math.max(0, Math.min(...posibles));
+}
