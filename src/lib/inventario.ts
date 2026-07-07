@@ -7,6 +7,11 @@ export async function reemplazarReceta(
   itemResultanteId: string,
   lineas: { insumoId: string; cantidad: number }[],
 ) {
+  const insumoIds = lineas.map((linea) => linea.insumoId);
+  if (new Set(insumoIds).size !== insumoIds.length) {
+    throw new Error("No puedes elegir el mismo insumo dos veces en la receta.");
+  }
+
   const { error: errorBorrar } = await supabase
     .from("inventario_receta")
     .delete()
