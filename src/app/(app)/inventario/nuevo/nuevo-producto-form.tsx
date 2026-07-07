@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { sinTildes } from "@/lib/texto";
 import { CampoMoneda } from "@/components/campo-moneda";
+import { RecetaLineas, type LineaRecetaValor } from "../receta-lineas";
 import { crearProducto, reabastecerProducto } from "./actions";
 
 type ItemExistente = {
@@ -13,6 +14,7 @@ type ItemExistente = {
   cantidad: number;
   costo: number | null;
   precio_venta: number | null;
+  unidad: string;
 };
 
 function filtrar(valores: string[], query: string) {
@@ -21,7 +23,13 @@ function filtrar(valores: string[], query: string) {
   return valores.filter((valor) => sinTildes(valor).includes(q)).slice(0, 8);
 }
 
-export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
+export function NuevoProductoForm({
+  items,
+  recetasPorItem,
+}: {
+  items: ItemExistente[];
+  recetasPorItem: Record<string, LineaRecetaValor[]>;
+}) {
   const router = useRouter();
 
   const categoriasExistentes = Array.from(
@@ -38,6 +46,7 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
+  const [receta, setReceta] = useState<LineaRecetaValor[]>([]);
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +57,10 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
         items.map((item) => item.nombre),
         nombre,
       );
+
+  const insumosDisponibles = items
+    .filter((item) => item.id !== itemExistente?.id)
+    .map((item) => ({ id: item.id, nombre: item.nombre, unidad: item.unidad }));
 
   function actualizarNombre(valor: string) {
     setNombre(valor);
@@ -105,6 +118,7 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
           cantidadAgregada: cantidadNum,
           costo: costoNum,
           precioVenta: precioVentaNum,
+          receta,
         });
       } else {
         await crearProducto({
@@ -113,6 +127,7 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
           cantidad: cantidadNum,
           costo: costoNum,
           precioVenta: precioVentaNum,
+          receta,
         });
       }
       router.push("/inventario?creado=1");
@@ -123,108 +138,125 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
   }
 
   return (
-    <div className="max-w-md">
+    <div className="max-w-4xl">
       <h1 className="mb-6 text-lg font-semibold text-gray-900">Agregar producto</h1>
 
-      <div className="space-y-4">
-        <div className="relative">
-          <label className="mb-1 block text-sm font-medium text-gray-700">Nombre *</label>
-          <input
-            value={nombre}
-            onChange={(e) => actualizarNombre(e.target.value)}
-            onFocus={() => setMostrarSugerenciasNombre(sugerenciasNombre.length > 0)}
-            onBlur={() => setTimeout(() => setMostrarSugerenciasNombre(false), 150)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-4">
+          <div className="relative">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Nombre *</label>
+            <input
+              value={nombre}
+              onChange={(e) => actualizarNombre(e.target.value)}
+              onFocus={() => setMostrarSugerenciasNombre(sugerenciasNombre.length > 0)}
+              onBlur={() => setTimeout(() => setMostrarSugerenciasNombre(false), 150)}
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            />
+            {mostrarSugerenciasNombre && sugerenciasNombre.length > 0 && (
+              <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+                {sugerenciasNombre.map((valor) => (
+                  <li key={valor}>
+                    <button
+                      type="button"
+                      onMouseDown={() => seleccionarExistente(valor)}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    >
+                      {valor}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {itemExistente && (
+              <p className="mt-1 text-xs text-green-600">
+                Producto existente — se le va a sumar cantidad al stock actual (
+                {itemExistente.cantidad}) y se actualizarán costo, precio y receta.
+              </p>
+            )}
+          </div>
+
+          <div className="relative">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Categoría (opcional)
+            </label>
+            <input
+              value={categoria}
+              onChange={(e) => {
+                setCategoria(e.target.value);
+                setMostrarSugerenciasCategoria(true);
+              }}
+              onFocus={() =>
+                setMostrarSugerenciasCategoria(filtrar(categoriasExistentes, categoria).length > 0)
+              }
+              onBlur={() => setTimeout(() => setMostrarSugerenciasCategoria(false), 150)}
+              placeholder="Ej. Jabones, Detergentes"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            />
+            {mostrarSugerenciasCategoria && filtrar(categoriasExistentes, categoria).length > 0 && (
+              <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+                {filtrar(categoriasExistentes, categoria).map((valor) => (
+                  <li key={valor}>
+                    <button
+                      type="button"
+                      onMouseDown={() => {
+                        setCategoria(valor);
+                        setMostrarSugerenciasCategoria(false);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    >
+                      {valor}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              {itemExistente ? "Cantidad a agregar *" : "Cantidad *"}
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            />
+          </div>
+
+          <CampoMoneda
+            label="Costo por unidad (precio de compra)"
+            required
+            value={costo}
+            onChange={setCosto}
           />
-          {mostrarSugerenciasNombre && sugerenciasNombre.length > 0 && (
-            <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
-              {sugerenciasNombre.map((valor) => (
-                <li key={valor}>
-                  <button
-                    type="button"
-                    onMouseDown={() => seleccionarExistente(valor)}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                  >
-                    {valor}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {itemExistente && (
-            <p className="mt-1 text-xs text-green-600">
-              Producto existente — se le va a sumar cantidad al stock actual ({itemExistente.cantidad})
-              y se actualizarán costo y precio.
-            </p>
-          )}
+
+          <CampoMoneda
+            label="Precio de venta"
+            required
+            value={precioVenta}
+            onChange={setPrecioVenta}
+          />
+
+          <p className="text-xs text-gray-400">* Campos obligatorios</p>
         </div>
 
-        <div className="relative">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Categoría (opcional)
-          </label>
-          <input
-            value={categoria}
-            onChange={(e) => {
-              setCategoria(e.target.value);
-              setMostrarSugerenciasCategoria(true);
-            }}
-            onFocus={() =>
-              setMostrarSugerenciasCategoria(filtrar(categoriasExistentes, categoria).length > 0)
-            }
-            onBlur={() => setTimeout(() => setMostrarSugerenciasCategoria(false), 150)}
-            placeholder="Ej. Jabones, Detergentes"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-          />
-          {mostrarSugerenciasCategoria && filtrar(categoriasExistentes, categoria).length > 0 && (
-            <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
-              {filtrar(categoriasExistentes, categoria).map((valor) => (
-                <li key={valor}>
-                  <button
-                    type="button"
-                    onMouseDown={() => {
-                      setCategoria(valor);
-                      setMostrarSugerenciasCategoria(false);
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                  >
-                    {valor}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            {itemExistente ? "Cantidad a agregar *" : "Cantidad *"}
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={cantidad}
-            onChange={(e) => setCantidad(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        <div className="rounded-lg border border-gray-200 p-4">
+          <h2 className="mb-1 text-sm font-semibold text-gray-900">Receta (opcional)</h2>
+          <p className="mb-4 text-xs text-gray-400">
+            Si este producto se arma combinando otros del inventario (ej. un envase + un
+            líquido), agrégalos aquí. Se descontarán automáticamente cada vez que uses
+            &ldquo;Producir&rdquo;.
+          </p>
+          <RecetaLineas
+            key={itemExistente?.id ?? "nuevo"}
+            insumosDisponibles={insumosDisponibles}
+            valorInicial={itemExistente ? recetasPorItem[itemExistente.id] ?? [] : []}
+            onChange={setReceta}
           />
         </div>
-
-        <CampoMoneda
-          label="Costo por unidad (precio de compra)"
-          required
-          value={costo}
-          onChange={setCosto}
-        />
-
-        <CampoMoneda
-          label="Precio de venta"
-          required
-          value={precioVenta}
-          onChange={setPrecioVenta}
-        />
       </div>
-
-      <p className="mt-3 text-xs text-gray-400">* Campos obligatorios</p>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
