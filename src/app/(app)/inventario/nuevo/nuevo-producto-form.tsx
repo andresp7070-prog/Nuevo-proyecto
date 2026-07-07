@@ -335,8 +335,8 @@ export function NuevoProductoForm({
 
   const campoCantidad = volverAReceta ? (
     <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-      La cantidad inicial es 0. Después de guardar, entra al producto y usa &ldquo;Guardar&rdquo;
-      para armar unidades — ahí se descuentan los insumos automáticamente.
+      Este producto no tiene una cantidad fija en stock — cuánto hay disponible se calcula
+      solo, según los insumos que le queden. Al venderlo, se descuentan automáticamente.
     </div>
   ) : (
     <div>

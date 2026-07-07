@@ -157,23 +157,46 @@ create table ventas_items (
 -- cada vez que se registra un item vendido, se congela su costo actual (para reportes de
 -- utilidad futuros) y, si es un producto físico, se genera el movimiento de salida y se
 -- resta la cantidad disponible. Nadie tiene que ajustar el inventario a mano.
+-- Si el producto vendido es compuesto (tiene receta en inventario_receta), no tiene stock
+-- propio: en vez de descontarse a sí mismo, se descuentan sus insumos según la receta × la
+-- cantidad vendida — la "producción" y la venta pasan a ser una sola operación automática.
 create or replace function descontar_inventario()
 returns trigger language plpgsql as $$
 declare
   v_tipo text;
   v_costo numeric(12,2);
+  v_receta record;
 begin
   if new.item_id is not null then
     select tipo, costo into v_tipo, v_costo from inventario_items where id = new.item_id;
     new.costo_unitario := v_costo;
 
     if v_tipo = 'producto' then
-      insert into inventario_movimientos (item_id, tipo, cantidad, nota)
-      values (new.item_id, 'salida', new.cantidad, 'Descuento automático por venta');
+      if exists (select 1 from inventario_receta where item_resultante_id = new.item_id) then
+        for v_receta in
+          select item_insumo_id, cantidad_insumo
+          from inventario_receta
+          where item_resultante_id = new.item_id
+        loop
+          insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
+          values (
+            v_receta.item_insumo_id, 'salida', 'trasvase',
+            v_receta.cantidad_insumo * new.cantidad,
+            'Consumido al vender ' || new.cantidad || ' unidad(es) de un producto compuesto'
+          );
 
-      update inventario_items
-      set cantidad = cantidad - new.cantidad
-      where id = new.item_id;
+          update inventario_items
+          set cantidad = cantidad - (v_receta.cantidad_insumo * new.cantidad)
+          where id = v_receta.item_insumo_id;
+        end loop;
+      else
+        insert into inventario_movimientos (item_id, tipo, cantidad, nota)
+        values (new.item_id, 'salida', new.cantidad, 'Descuento automático por venta');
+
+        update inventario_items
+        set cantidad = cantidad - new.cantidad
+        where id = new.item_id;
+      end if;
     end if;
   end if;
   return new;
@@ -199,45 +222,6 @@ create table inventario_receta (
   created_at timestamptz default now(),
   unique (item_resultante_id, item_insumo_id)
 );
-
--- Registrar producción: dado un producto resultante y cuántas unidades se
--- produjeron, descuenta automáticamente cada insumo de su receta (en la
--- unidad propia de cada uno) y suma la cantidad producida al resultante.
--- Una sola operación — nadie calcula los insumos a mano cada vez.
-create or replace function registrar_produccion(
-  p_item_resultante_id uuid,
-  p_cantidad_producida numeric
-)
-returns void
-language plpgsql
-as $$
-declare
-  v_receta record;
-begin
-  for v_receta in
-    select item_insumo_id, cantidad_insumo
-    from inventario_receta
-    where item_resultante_id = p_item_resultante_id
-  loop
-    insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
-    values (
-      v_receta.item_insumo_id, 'salida', 'trasvase',
-      v_receta.cantidad_insumo * p_cantidad_producida,
-      'Consumido al producir ' || p_cantidad_producida || ' unidad(es) del producto resultante'
-    );
-    update inventario_items
-    set cantidad = cantidad - (v_receta.cantidad_insumo * p_cantidad_producida)
-    where id = v_receta.item_insumo_id;
-  end loop;
-
-  insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
-  values (p_item_resultante_id, 'entrada', 'trasvase', p_cantidad_producida, 'Producción registrada');
-
-  update inventario_items
-  set cantidad = cantidad + p_cantidad_producida
-  where id = p_item_resultante_id;
-end;
-$$;
 
 -- Reabastecer un producto que ya existe: suma cantidad al stock actual
 -- (nunca lo reemplaza) y actualiza costo, precio de venta y categoría a

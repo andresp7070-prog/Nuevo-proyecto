@@ -75,20 +75,21 @@ export default async function FichaProductoPage({
             >
               Configurar receta
             </Link>
-            <Link
-              href={`/inventario/${item.id}/producir`}
-              className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
-            >
-              Guardar
-            </Link>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
           <div>
-            <p className="text-gray-400">Cantidad en stock</p>
-            <p className="font-medium text-gray-900">
-              {item.cantidad} {etiquetaUnidad(item.unidad)}
+            <p className="text-gray-400">
+              {maxProducible !== null ? "Cantidad disponible" : "Cantidad en stock"}
+            </p>
+            <p
+              className={`font-medium ${
+                maxProducible !== null && maxProducible <= 0 ? "text-red-600" : "text-gray-900"
+              }`}
+            >
+              {maxProducible !== null ? maxProducible : item.cantidad}{" "}
+              {etiquetaUnidad(item.unidad)}
             </p>
           </div>
           <div>
@@ -100,36 +101,31 @@ export default async function FichaProductoPage({
             <p className="font-medium text-gray-900">{formatoMoneda(item.precio_venta)}</p>
           </div>
         </div>
+        {maxProducible !== null && (
+          <p className="mt-2 text-xs text-gray-400">
+            Se calcula solo, según el insumo de la receta que menos tengas disponible — no es un
+            número que se guarde.
+          </p>
+        )}
       </div>
 
       <div className="rounded-lg border border-gray-200 p-4">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">Receta</h2>
         {receta.length === 0 ? (
           <p className="text-sm text-gray-400">
-            Este producto no tiene receta configurada — &ldquo;Guardar&rdquo; solo sumará al
-            stock, sin descontar insumos.
+            Este producto no tiene receta configurada — no se descuenta ningún insumo al
+            venderlo.
           </p>
         ) : (
-          <>
-            <p
-              className={`mb-3 text-sm font-medium ${
-                maxProducible !== null && maxProducible <= 0 ? "text-red-600" : "text-gray-700"
-              }`}
-            >
-              {maxProducible !== null && maxProducible <= 0
-                ? "No hay insumos suficientes para producir ni una unidad."
-                : `Con el inventario actual de insumos se pueden producir hasta ${maxProducible} unidades.`}
-            </p>
-            <ul className="divide-y divide-gray-200">
-              {receta.map((fila, i) => (
-                <li key={i} className="py-2 text-sm text-gray-900">
-                  {fila.cantidad_insumo}{" "}
-                  {fila.inventario_items ? etiquetaUnidad(fila.inventario_items.unidad) : ""} de{" "}
-                  {fila.inventario_items?.nombre}
-                </li>
-              ))}
-            </ul>
-          </>
+          <ul className="divide-y divide-gray-200">
+            {receta.map((fila, i) => (
+              <li key={i} className="py-2 text-sm text-gray-900">
+                {fila.cantidad_insumo}{" "}
+                {fila.inventario_items ? etiquetaUnidad(fila.inventario_items.unidad) : ""} de{" "}
+                {fila.inventario_items?.nombre}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>
