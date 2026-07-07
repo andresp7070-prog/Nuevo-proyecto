@@ -12,14 +12,20 @@ type Item = {
   insumos: number;
 };
 
+function filtrarPorTexto(items: Item[], busqueda: string) {
+  const q = sinTildes(busqueda.trim());
+  if (!q) return [];
+  return items
+    .filter((item) => sinTildes(item.nombre).includes(q) || sinTildes(item.categoria ?? "").includes(q))
+    .slice(0, 8);
+}
+
 export function DirectorioRecetas({ items }: { items: Item[] }) {
   const [busqueda, setBusqueda] = useState("");
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
 
-  const filtrados = items.filter((item) => {
-    const q = sinTildes(busqueda.trim());
-    if (!q) return true;
-    return sinTildes(item.nombre).includes(q) || sinTildes(item.categoria ?? "").includes(q);
-  });
+  const configuradas = items.filter((item) => item.insumos > 0);
+  const sugerencias = filtrarPorTexto(items, busqueda);
 
   return (
     <div>
@@ -28,22 +34,54 @@ export function DirectorioRecetas({ items }: { items: Item[] }) {
       <div className="mb-6">
         <h1 className="text-lg font-semibold text-gray-900">Recetas</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Configura qué insumos se descuentan automáticamente al producir cada producto.
+          Solo para productos que se arman combinando otros (ej. una hamburguesa hecha de
+          carne, pan, lechuga, tomate y queso). Los ingredientes sueltos no necesitan receta.
         </p>
       </div>
 
-      <input
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        placeholder="Buscar por nombre o categoría"
-        className="mb-4 w-full max-w-xs rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-      />
+      <div className="relative mb-6 max-w-xs">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Configurar receta de un producto
+        </label>
+        <input
+          value={busqueda}
+          onChange={(e) => {
+            setBusqueda(e.target.value);
+            setMostrarSugerencias(true);
+          }}
+          onFocus={() => setMostrarSugerencias(sugerencias.length > 0)}
+          onBlur={() => setTimeout(() => setMostrarSugerencias(false), 150)}
+          placeholder="Ej. Hamburguesa"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        />
+        {mostrarSugerencias && sugerencias.length > 0 && (
+          <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+            {sugerencias.map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={`/inventario/${item.id}/receta`}
+                  className="block px-3 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  {item.nombre}
+                  {item.insumos > 0 && (
+                    <span className="ml-1 text-xs text-gray-400">(ya tiene receta)</span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
-      {filtrados.length === 0 ? (
-        <p className="text-gray-400">No hay productos que coincidan.</p>
+      <h2 className="mb-2 text-sm font-semibold text-gray-900">Recetas configuradas</h2>
+      {configuradas.length === 0 ? (
+        <p className="text-gray-400">
+          Aún no has configurado ninguna receta. Busca arriba el producto que se arma
+          combinando otros (ej. &ldquo;Hamburguesa&rdquo;) para empezar.
+        </p>
       ) : (
         <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
-          {filtrados.map((item) => (
+          {configuradas.map((item) => (
             <li key={item.id}>
               <Link
                 href={`/inventario/${item.id}/receta`}
@@ -54,9 +92,8 @@ export function DirectorioRecetas({ items }: { items: Item[] }) {
                   <p className="text-xs text-gray-400">{item.categoria || "Sin categoría"}</p>
                 </div>
                 <p className="text-sm text-gray-500">
-                  {item.insumos > 0
-                    ? `${item.insumos} insumo${item.insumos === 1 ? "" : "s"} configurado${item.insumos === 1 ? "" : "s"}`
-                    : "Sin receta"}
+                  {item.insumos} insumo{item.insumos === 1 ? "" : "s"} configurado
+                  {item.insumos === 1 ? "" : "s"}
                 </p>
               </Link>
             </li>
