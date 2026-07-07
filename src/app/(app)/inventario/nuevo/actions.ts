@@ -36,3 +36,27 @@ export async function crearProducto(input: {
 
   if (error) throw new Error(error.message);
 }
+
+export async function reabastecerProducto(input: {
+  itemId: string;
+  categoria: string;
+  cantidadAgregada: number;
+  costo: number;
+  precioVenta: number;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("No hay sesión activa.");
+
+  const { error } = await supabase.rpc("reabastecer_producto", {
+    p_item_id: input.itemId,
+    p_cantidad_agregada: input.cantidadAgregada,
+    p_costo: input.costo,
+    p_precio_venta: input.precioVenta,
+    p_categoria: input.categoria || null,
+  });
+
+  if (error) throw new Error(error.message);
+}

@@ -222,6 +222,30 @@ begin
 end;
 $$;
 
+-- Reabastecer un producto que ya existe: suma cantidad al stock actual
+-- (nunca lo reemplaza) y actualiza costo, precio de venta y categoría a
+-- los valores más recientes. Se usa desde "Agregar producto" cuando la
+-- persona busca el nombre y encuentra que ya existe, en vez de crear un
+-- duplicado. Es una sola operación atómica para evitar perder cantidad
+-- si dos personas reabastecen el mismo producto casi al mismo tiempo.
+create or replace function reabastecer_producto(
+  p_item_id uuid,
+  p_cantidad_agregada numeric,
+  p_costo numeric,
+  p_precio_venta numeric,
+  p_categoria text
+)
+returns void
+language sql
+as $$
+  update inventario_items
+  set cantidad = cantidad + p_cantidad_agregada,
+      costo = p_costo,
+      precio_venta = p_precio_venta,
+      categoria = p_categoria
+  where id = p_item_id;
+$$;
+
 -- ------------------------------------------------------------
 -- 9. FINANZAS — alimenta el estado de pérdidas y ganancias
 -- ------------------------------------------------------------
