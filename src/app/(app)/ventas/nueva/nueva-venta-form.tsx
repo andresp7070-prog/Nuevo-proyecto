@@ -169,7 +169,7 @@ export function NuevaVentaForm({
     setGuardando(true);
     try {
       const fechaHora = new Date(`${fecha}T${hora}:00`).toISOString();
-      await guardarVenta({
+      const resultado = await guardarVenta({
         contactoId,
         clienteNombre: nombre.trim(),
         clienteTelefono: telefono.trim(),
@@ -182,6 +182,11 @@ export function NuevaVentaForm({
           precioUnitario: linea.precioUnitario,
         })),
       });
+      if (resultado.error) {
+        setError(resultado.error);
+        setGuardando(false);
+        return;
+      }
       router.push("/ventas?guardada=1");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar la venta.");

@@ -29,7 +29,11 @@ export function NuevaInteraccionForm({ contactoId }: { contactoId: string }) {
 
     setGuardando(true);
     try {
-      await agregarInteraccion({ contactoId, fecha, tipo, nota: nota.trim() });
+      const resultado = await agregarInteraccion({ contactoId, fecha, tipo, nota: nota.trim() });
+      if (resultado.error) {
+        setError(resultado.error);
+        return;
+      }
       setNota("");
       router.refresh();
     } catch (err) {

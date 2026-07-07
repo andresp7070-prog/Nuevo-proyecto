@@ -33,13 +33,18 @@ export function NuevoClienteForm() {
 
     setGuardando(true);
     try {
-      const { id } = await crearCliente({
+      const resultado = await crearCliente({
         nombre: nombre.trim(),
         telefono: telefono.trim(),
         email: email.trim(),
         empresaCliente: empresaCliente.trim(),
       });
-      router.push(`/crm/${id}?creado=1`);
+      if (resultado.error || !resultado.id) {
+        setError(resultado.error ?? "No se pudo crear el cliente.");
+        setGuardando(false);
+        return;
+      }
+      router.push(`/crm/${resultado.id}?creado=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear el cliente.");
       setGuardando(false);

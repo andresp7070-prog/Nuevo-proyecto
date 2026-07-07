@@ -2,14 +2,18 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export async function cambiarEtapa(contactoId: string, etapa: string) {
+export async function cambiarEtapa(
+  contactoId: string,
+  etapa: string,
+): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("crm_contactos")
     .update({ etapa_pipeline: etapa })
     .eq("id", contactoId);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+  return { error: null };
 }
 
 export async function agregarInteraccion(input: {
@@ -17,7 +21,7 @@ export async function agregarInteraccion(input: {
   fecha: string;
   tipo: string;
   nota: string;
-}) {
+}): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const { error } = await supabase.from("crm_interacciones").insert({
     contacto_id: input.contactoId,
@@ -26,5 +30,6 @@ export async function agregarInteraccion(input: {
     nota: input.nota,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+  return { error: null };
 }

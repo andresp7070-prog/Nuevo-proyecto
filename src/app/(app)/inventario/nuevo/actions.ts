@@ -10,12 +10,12 @@ export async function crearProducto(input: {
   costo: number;
   precioVenta: number;
   atributos?: Record<string, unknown>;
-}) {
+}): Promise<{ error: string | null; id?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("No hay sesión activa.");
+  if (!user) return { error: "No hay sesión activa." };
 
   const { data: perfil } = await supabase
     .from("perfiles")
@@ -24,7 +24,7 @@ export async function crearProducto(input: {
     .single();
 
   if (!perfil?.empresa_id) {
-    throw new Error("Tu usuario no tiene una empresa asignada.");
+    return { error: "Tu usuario no tiene una empresa asignada." };
   }
 
   const { data, error } = await supabase
@@ -42,9 +42,9 @@ export async function crearProducto(input: {
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
 
-  return { id: data.id as string };
+  return { error: null, id: data.id as string };
 }
 
 export async function reabastecerProducto(input: {
@@ -53,12 +53,12 @@ export async function reabastecerProducto(input: {
   cantidadAgregada: number;
   costo: number;
   precioVenta: number;
-}) {
+}): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("No hay sesión activa.");
+  if (!user) return { error: "No hay sesión activa." };
 
   const { error } = await supabase.rpc("reabastecer_producto", {
     p_item_id: input.itemId,
@@ -68,5 +68,6 @@ export async function reabastecerProducto(input: {
     p_categoria: input.categoria || null,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
+  return { error: null };
 }

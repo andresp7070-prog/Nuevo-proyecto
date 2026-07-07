@@ -159,16 +159,27 @@ export function NuevoProductoForm({
     setGuardando(true);
     try {
       if (itemExistente) {
-        await reabastecerProducto({
+        const resultado = await reabastecerProducto({
           itemId: itemExistente.id,
           categoria: categoriaFinal,
           cantidadAgregada: cantidadNum,
           costo: costoNum,
           precioVenta: precioVentaNum,
         });
+        if (resultado.error) {
+          setError(resultado.error);
+          return;
+        }
         if (volverAReceta) {
           if (receta.length > 0) {
-            await guardarReceta({ itemResultanteId: itemExistente.id, lineas: receta });
+            const resultadoReceta = await guardarReceta({
+              itemResultanteId: itemExistente.id,
+              lineas: receta,
+            });
+            if (resultadoReceta.error) {
+              setError(resultadoReceta.error);
+              return;
+            }
           }
           router.push(`/inventario/${itemExistente.id}`);
           return;
@@ -177,7 +188,7 @@ export function NuevoProductoForm({
         reiniciarFormulario();
         router.refresh();
       } else {
-        const { id } = await crearProducto({
+        const resultado = await crearProducto({
           nombre: nombreFinal,
           categoria: categoriaFinal,
           unidad,
@@ -189,11 +200,22 @@ export function NuevoProductoForm({
               ? { contenido_por_unidad: Number(contenidoPorUnidad) }
               : undefined,
         });
+        if (resultado.error || !resultado.id) {
+          setError(resultado.error ?? "No se pudo guardar el producto.");
+          return;
+        }
         if (volverAReceta) {
           if (receta.length > 0) {
-            await guardarReceta({ itemResultanteId: id, lineas: receta });
+            const resultadoReceta = await guardarReceta({
+              itemResultanteId: resultado.id,
+              lineas: receta,
+            });
+            if (resultadoReceta.error) {
+              setError(resultadoReceta.error);
+              return;
+            }
           }
-          router.push(`/inventario/${id}`);
+          router.push(`/inventario/${resultado.id}`);
           return;
         }
         setMensajeExito(`"${nombreFinal}" creado correctamente.`);

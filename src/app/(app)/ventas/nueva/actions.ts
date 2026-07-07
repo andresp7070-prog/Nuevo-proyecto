@@ -31,7 +31,7 @@ export async function buscarClientes(query: string): Promise<ClienteEncontrado[]
     p_query: query,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) return [];
   return data ?? [];
 }
 
@@ -49,12 +49,12 @@ export async function guardarVenta(input: {
   fecha: string;
   metodoPago: string;
   items: ItemVentaInput[];
-}) {
+}): Promise<{ error: string | null; ventaId?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("No hay sesión activa.");
+  if (!user) return { error: "No hay sesión activa." };
 
   const { data: perfil } = await supabase
     .from("perfiles")
@@ -63,7 +63,7 @@ export async function guardarVenta(input: {
     .single();
 
   if (!perfil?.empresa_id) {
-    throw new Error("Tu usuario no tiene una empresa asignada.");
+    return { error: "Tu usuario no tiene una empresa asignada." };
   }
 
   const { data: ventaId, error } = await supabase.rpc("registrar_venta", {
@@ -83,6 +83,6 @@ export async function guardarVenta(input: {
     p_metodo_pago: input.metodoPago,
   });
 
-  if (error) throw new Error(error.message);
-  return { ventaId: ventaId as string };
+  if (error) return { error: error.message };
+  return { error: null, ventaId: ventaId as string };
 }

@@ -27,7 +27,12 @@ export function RecetaForm({
     setError(null);
     setGuardando(true);
     try {
-      await guardarReceta({ itemResultanteId: itemResultante.id, lineas });
+      const resultado = await guardarReceta({ itemResultanteId: itemResultante.id, lineas });
+      if (resultado.error) {
+        setError(resultado.error);
+        setGuardando(false);
+        return;
+      }
       router.push(`/inventario/${itemResultante.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar la receta.");
