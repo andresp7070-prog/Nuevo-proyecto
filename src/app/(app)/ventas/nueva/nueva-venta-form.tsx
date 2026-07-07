@@ -348,8 +348,27 @@ export function NuevaVentaForm({
         + Agregar producto
       </button>
 
-      <div className="mt-4 border-t border-gray-200 pt-3 text-right text-sm font-semibold text-gray-900">
-        Total: {total.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+      <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">
+            Método de pago *
+          </label>
+          <select
+            value={metodoPago}
+            onChange={(e) => setMetodoPago(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          >
+            {metodosPago.length === 0 && <option value="">Sin métodos configurados</option>}
+            {metodosPago.map((valor) => (
+              <option key={valor} value={valor}>
+                {etiquetaMetodoPago[valor] ?? valor}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-sm font-semibold text-gray-900">
+          Total: {total.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+        </p>
       </div>
     </section>
   );
@@ -376,7 +395,7 @@ export function NuevaVentaForm({
         </button>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Fecha</label>
           <input
@@ -394,21 +413,6 @@ export function NuevaVentaForm({
             onChange={(e) => setHora(e.target.value)}
             className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Método de pago *</label>
-          <select
-            value={metodoPago}
-            onChange={(e) => setMetodoPago(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-          >
-            {metodosPago.length === 0 && <option value="">Sin métodos configurados</option>}
-            {metodosPago.map((valor) => (
-              <option key={valor} value={valor}>
-                {etiquetaMetodoPago[valor] ?? valor}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
