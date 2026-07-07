@@ -52,6 +52,7 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
   function actualizarNombre(valor: string) {
     setNombre(valor);
     setItemExistente(null);
+    setMostrarSugerenciasNombre(true);
   }
 
   function seleccionarExistente(itemNombre: string) {
@@ -164,7 +165,10 @@ export function NuevoProductoForm({ items }: { items: ItemExistente[] }) {
           </label>
           <input
             value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
+            onChange={(e) => {
+              setCategoria(e.target.value);
+              setMostrarSugerenciasCategoria(true);
+            }}
             onFocus={() =>
               setMostrarSugerenciasCategoria(filtrar(categoriasExistentes, categoria).length > 0)
             }
