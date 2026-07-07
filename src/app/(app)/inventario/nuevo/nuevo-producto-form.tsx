@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { sinTildes, primeraMayuscula } from "@/lib/texto";
@@ -56,6 +56,15 @@ export function NuevoProductoForm({
   const [error, setError] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
 
+  const nombreRef = useRef<HTMLInputElement>(null);
+  const cantidadRef = useRef<HTMLInputElement>(null);
+
+  function irAlCampo(elemento: HTMLElement | null) {
+    if (!elemento) return;
+    elemento.scrollIntoView({ behavior: "smooth", block: "center" });
+    elemento.focus();
+  }
+
   const sugerenciasNombre = itemExistente
     ? []
     : filtrar(
@@ -104,6 +113,7 @@ export function NuevoProductoForm({
 
     if (!nombre.trim()) {
       setError("El nombre es obligatorio.");
+      irAlCampo(nombreRef.current);
       return;
     }
 
@@ -117,14 +127,17 @@ export function NuevoProductoForm({
           ? "La cantidad a agregar es obligatoria y debe ser un número mayor o igual a cero."
           : "La cantidad es obligatoria y debe ser un número mayor o igual a cero.",
       );
+      irAlCampo(cantidadRef.current);
       return;
     }
     if (costo.trim() === "" || Number.isNaN(costoNum) || costoNum < 0) {
       setError("El costo es obligatorio y debe ser un número mayor o igual a cero.");
+      irAlCampo(document.getElementById("costo"));
       return;
     }
     if (precioVenta.trim() === "" || Number.isNaN(precioVentaNum) || precioVentaNum < 0) {
       setError("El precio de venta es obligatorio y debe ser un número mayor o igual a cero.");
+      irAlCampo(document.getElementById("precioVenta"));
       return;
     }
 
@@ -179,11 +192,18 @@ export function NuevoProductoForm({
         </p>
       )}
 
+      {error && (
+        <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+          {error}
+        </p>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div className="relative">
             <label className="mb-1 block text-sm font-medium text-gray-700">Nombre *</label>
             <input
+              ref={nombreRef}
               value={nombre}
               onChange={(e) => actualizarNombre(e.target.value)}
               onFocus={() => setMostrarSugerenciasNombre(sugerenciasNombre.length > 0)}
@@ -287,6 +307,7 @@ export function NuevoProductoForm({
               )
             </label>
             <input
+              ref={cantidadRef}
               type="number"
               min={0}
               value={cantidad}
@@ -296,6 +317,7 @@ export function NuevoProductoForm({
           </div>
 
           <CampoMoneda
+            id="costo"
             label="Costo por unidad (precio de compra)"
             required
             value={costo}
@@ -303,6 +325,7 @@ export function NuevoProductoForm({
           />
 
           <CampoMoneda
+            id="precioVenta"
             label="Precio de venta"
             required
             value={precioVenta}
@@ -327,8 +350,6 @@ export function NuevoProductoForm({
           />
         </div>
       </div>
-
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       <button
         type="button"

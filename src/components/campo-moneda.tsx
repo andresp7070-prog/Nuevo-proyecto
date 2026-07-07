@@ -7,11 +7,13 @@ export function CampoMoneda({
   onChange,
   label,
   required,
+  id,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
   required?: boolean;
+  id?: string;
 }) {
   const [enfocado, setEnfocado] = useState(false);
 
@@ -31,6 +33,7 @@ export function CampoMoneda({
           $
         </span>
         <input
+          id={id}
           value={mostrado}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
           onFocus={() => setEnfocado(true)}
