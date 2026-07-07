@@ -196,6 +196,180 @@ export function NuevoProductoForm({
     }
   }
 
+  const campoNombre = (
+    <div className="relative">
+      <label className="mb-1 block text-sm font-medium text-gray-700">Nombre *</label>
+      <input
+        ref={nombreRef}
+        value={nombre}
+        onChange={(e) => actualizarNombre(e.target.value)}
+        onFocus={() => setMostrarSugerenciasNombre(sugerenciasNombre.length > 0)}
+        onBlur={() => setTimeout(() => setMostrarSugerenciasNombre(false), 150)}
+        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+      />
+      {mostrarSugerenciasNombre && sugerenciasNombre.length > 0 && (
+        <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+          {sugerenciasNombre.map((valor) => (
+            <li key={valor}>
+              <button
+                type="button"
+                onMouseDown={() => seleccionarExistente(valor)}
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                {valor}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {itemExistente && (
+        <p className="mt-1 text-xs text-green-600">
+          Producto existente — se le va a sumar cantidad al stock actual (
+          {itemExistente.cantidad}) y se actualizarán costo y precio.
+        </p>
+      )}
+    </div>
+  );
+
+  const campoCategoria = (
+    <div className="relative">
+      <label className="mb-1 block text-sm font-medium text-gray-700">Categoría (opcional)</label>
+      <input
+        value={categoria}
+        onChange={(e) => {
+          setCategoria(e.target.value);
+          setMostrarSugerenciasCategoria(true);
+        }}
+        onFocus={() =>
+          setMostrarSugerenciasCategoria(filtrar(categoriasExistentes, categoria).length > 0)
+        }
+        onBlur={() => setTimeout(() => setMostrarSugerenciasCategoria(false), 150)}
+        placeholder="Ej. Jabones, Detergentes"
+        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+      />
+      {mostrarSugerenciasCategoria && filtrar(categoriasExistentes, categoria).length > 0 && (
+        <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+          {filtrar(categoriasExistentes, categoria).map((valor) => (
+            <li key={valor}>
+              <button
+                type="button"
+                onMouseDown={() => {
+                  setCategoria(valor);
+                  setMostrarSugerenciasCategoria(false);
+                }}
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                {valor}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
+  const campoUnidad = (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">
+        Unidad{volverAReceta ? " (opcional)" : " *"}
+      </label>
+      {itemExistente ? (
+        <input
+          value={UNIDADES.find((u) => u.valor === itemExistente.unidad)?.etiqueta ?? itemExistente.unidad}
+          disabled
+          className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+        />
+      ) : (
+        <select
+          value={unidad}
+          onChange={(e) => setUnidad(e.target.value)}
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        >
+          {UNIDADES.map((u) => (
+            <option key={u.valor} value={u.valor}>
+              {u.etiqueta}
+            </option>
+          ))}
+        </select>
+      )}
+      {itemExistente && (
+        <p className="mt-1 text-xs text-gray-400">
+          La unidad de un producto ya existente no se puede cambiar.
+        </p>
+      )}
+    </div>
+  );
+
+  const campoCantidad = volverAReceta ? (
+    <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+      La cantidad inicial es 0. Después de guardar, usa &ldquo;Producir&rdquo; para armar
+      unidades — ahí se descuentan los insumos automáticamente.
+    </div>
+  ) : (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">
+        {itemExistente ? "Cantidad a agregar *" : "Cantidad *"} (
+        {itemExistente
+          ? UNIDADES.find((u) => u.valor === itemExistente.unidad)?.etiqueta
+          : UNIDADES.find((u) => u.valor === unidad)?.etiqueta}
+        )
+      </label>
+      <input
+        ref={cantidadRef}
+        type="number"
+        min={0}
+        value={cantidad}
+        onChange={(e) => setCantidad(e.target.value)}
+        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+      />
+    </div>
+  );
+
+  const campoCosto = volverAReceta ? (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">
+        Costo por unidad (calculado según la receta)
+      </label>
+      <div className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+        {costoCalculado.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+      </div>
+      <p className="mt-1 text-xs text-gray-400">
+        Suma del costo de cada insumo según la cantidad que le pusiste arriba.
+      </p>
+    </div>
+  ) : (
+    <CampoMoneda
+      id="costo"
+      label="Costo por unidad (precio de compra)"
+      required
+      value={costo}
+      onChange={setCosto}
+    />
+  );
+
+  const campoPrecioVenta = (
+    <CampoMoneda
+      id="precioVenta"
+      label={volverAReceta ? "Precio de venta estimado" : "Precio de venta"}
+      required
+      value={precioVenta}
+      onChange={setPrecioVenta}
+    />
+  );
+
+  const panelReceta = (
+    <div className="rounded-lg border border-gray-200 p-4">
+      <h2 className="mb-1 text-sm font-semibold text-gray-900">
+        ¿De qué insumos se compone?
+      </h2>
+      <p className="mb-4 text-xs text-gray-400">
+        Elige los insumos y cuánto lleva cada uno — se descontarán automáticamente al producir
+        una unidad de este producto, y con esto calculamos el costo de abajo.
+      </p>
+      <RecetaLineas insumosDisponibles={insumosDisponibles} onChange={setReceta} />
+    </div>
+  );
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -210,8 +384,9 @@ export function NuevoProductoForm({
 
       {volverAReceta && (
         <p className="mb-4 rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
-          Como este producto se arma combinando otros, elige aquí abajo de qué insumos se
-          compone — la cantidad inicial y el costo por unidad se calculan solos a partir de eso.
+          Primero elige de qué insumos se compone este producto — así calculamos su costo y
+          puedes poner un precio de venta con eso en mente. Al final le pones nombre y, si
+          hace falta, unidad.
         </p>
       )}
 
@@ -227,170 +402,28 @@ export function NuevoProductoForm({
         </p>
       )}
 
-      <div className="max-w-md space-y-4">
-        <div className="relative">
-          <label className="mb-1 block text-sm font-medium text-gray-700">Nombre *</label>
-          <input
-            ref={nombreRef}
-            value={nombre}
-            onChange={(e) => actualizarNombre(e.target.value)}
-            onFocus={() => setMostrarSugerenciasNombre(sugerenciasNombre.length > 0)}
-            onBlur={() => setTimeout(() => setMostrarSugerenciasNombre(false), 150)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-          />
-          {mostrarSugerenciasNombre && sugerenciasNombre.length > 0 && (
-            <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
-              {sugerenciasNombre.map((valor) => (
-                <li key={valor}>
-                  <button
-                    type="button"
-                    onMouseDown={() => seleccionarExistente(valor)}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                  >
-                    {valor}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {itemExistente && (
-            <p className="mt-1 text-xs text-green-600">
-              Producto existente — se le va a sumar cantidad al stock actual (
-              {itemExistente.cantidad}) y se actualizarán costo y precio.
-            </p>
-          )}
-        </div>
-
-        <div className="relative">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Categoría (opcional)
-          </label>
-          <input
-            value={categoria}
-            onChange={(e) => {
-              setCategoria(e.target.value);
-              setMostrarSugerenciasCategoria(true);
-            }}
-            onFocus={() =>
-              setMostrarSugerenciasCategoria(filtrar(categoriasExistentes, categoria).length > 0)
-            }
-            onBlur={() => setTimeout(() => setMostrarSugerenciasCategoria(false), 150)}
-            placeholder="Ej. Jabones, Detergentes"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-          />
-          {mostrarSugerenciasCategoria && filtrar(categoriasExistentes, categoria).length > 0 && (
-            <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
-              {filtrar(categoriasExistentes, categoria).map((valor) => (
-                <li key={valor}>
-                  <button
-                    type="button"
-                    onMouseDown={() => {
-                      setCategoria(valor);
-                      setMostrarSugerenciasCategoria(false);
-                    }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                  >
-                    {valor}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Unidad *</label>
-          {itemExistente ? (
-            <input
-              value={UNIDADES.find((u) => u.valor === itemExistente.unidad)?.etiqueta ?? itemExistente.unidad}
-              disabled
-              className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
-            />
-          ) : (
-            <select
-              value={unidad}
-              onChange={(e) => setUnidad(e.target.value)}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-            >
-              {UNIDADES.map((u) => (
-                <option key={u.valor} value={u.valor}>
-                  {u.etiqueta}
-                </option>
-              ))}
-            </select>
-          )}
-          {itemExistente && (
-            <p className="mt-1 text-xs text-gray-400">
-              La unidad de un producto ya existente no se puede cambiar.
-            </p>
-          )}
-        </div>
-
-        {volverAReceta ? (
-          <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-            La cantidad inicial es 0. Después de guardar, usa &ldquo;Producir&rdquo; para armar
-            unidades — ahí se descuentan los insumos automáticamente.
+      {volverAReceta ? (
+        <div className="max-w-2xl space-y-6">
+          {panelReceta}
+          <div className="max-w-md space-y-4">
+            {campoCosto}
+            {campoPrecioVenta}
+            {campoNombre}
+            {campoCategoria}
+            {campoUnidad}
+            {campoCantidad}
+            <p className="text-xs text-gray-400">* Campos obligatorios</p>
           </div>
-        ) : (
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {itemExistente ? "Cantidad a agregar *" : "Cantidad *"} (
-              {itemExistente
-                ? UNIDADES.find((u) => u.valor === itemExistente.unidad)?.etiqueta
-                : UNIDADES.find((u) => u.valor === unidad)?.etiqueta}
-              )
-            </label>
-            <input
-              ref={cantidadRef}
-              type="number"
-              min={0}
-              value={cantidad}
-              onChange={(e) => setCantidad(e.target.value)}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-            />
-          </div>
-        )}
-
-        {volverAReceta ? (
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Costo por unidad (calculado según la receta)
-            </label>
-            <div className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-              {costoCalculado.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
-            </div>
-            <p className="mt-1 text-xs text-gray-400">
-              Suma del costo de cada insumo según la cantidad que le pongas abajo.
-            </p>
-          </div>
-        ) : (
-          <CampoMoneda
-            id="costo"
-            label="Costo por unidad (precio de compra)"
-            required
-            value={costo}
-            onChange={setCosto}
-          />
-        )}
-
-        <CampoMoneda
-          id="precioVenta"
-          label="Precio de venta"
-          required
-          value={precioVenta}
-          onChange={setPrecioVenta}
-        />
-
-        <p className="text-xs text-gray-400">* Campos obligatorios</p>
-      </div>
-
-      {volverAReceta && (
-        <div className="mt-6 max-w-2xl rounded-lg border border-gray-200 p-4">
-          <h2 className="mb-1 text-sm font-semibold text-gray-900">Receta</h2>
-          <p className="mb-4 text-xs text-gray-400">
-            Insumos que se descuentan automáticamente al producir una unidad de este producto.
-          </p>
-          <RecetaLineas insumosDisponibles={insumosDisponibles} onChange={setReceta} />
+        </div>
+      ) : (
+        <div className="max-w-md space-y-4">
+          {campoNombre}
+          {campoCategoria}
+          {campoUnidad}
+          {campoCantidad}
+          {campoCosto}
+          {campoPrecioVenta}
+          <p className="text-xs text-gray-400">* Campos obligatorios</p>
         </div>
       )}
 
