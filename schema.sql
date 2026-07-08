@@ -332,8 +332,14 @@ left join otros_mes om on om.empresa_id = p.empresa_id and om.mes = p.mes;
 
 -- ------------------------------------------------------------
 -- Pasivos y deudas por pagar
--- No es parte del cálculo de utilidad (eso sería mezclar conceptos
--- contables distintos) — se muestra al lado de la utilidad, no dentro.
+-- Crear la deuda no genera ningún gasto por sí sola — ese dinero
+-- todavía no ha salido. El gasto real (criterio de caja) se registra
+-- cuando efectivamente se abona o se paga, con la fecha en que
+-- ocurrió: cada abono genera su propio movimiento en
+-- finanzas_movimientos (enlazado vía pasivo_id más abajo), así sí
+-- impacta vista_estado_resultados en el mes correspondiente, sin
+-- duplicar — solo se cuenta la porción abonada, nunca la deuda
+-- completa de una vez.
 -- ------------------------------------------------------------
 create table pasivos (
   id uuid primary key default gen_random_uuid(),
@@ -346,6 +352,11 @@ create table pasivos (
   estado text not null default 'pendiente' check (estado in ('pendiente','pagado','vencido')),
   created_at timestamptz default now()
 );
+
+-- Enlaza cada abono/pago (registrado como gasto en finanzas_movimientos,
+-- categoría 'pago de deuda') con la deuda a la que corresponde. Nulo
+-- para cualquier otro gasto o ingreso que no sea un pago de deuda.
+alter table finanzas_movimientos add column pasivo_id uuid references pasivos(id);
 
 -- ------------------------------------------------------------
 -- Vista: Utilidad por producto y por categoría

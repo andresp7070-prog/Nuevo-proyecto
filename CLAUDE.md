@@ -84,8 +84,9 @@ Definida con el caso base de un negocio de productos de aseo del hogar (sin serv
 ### Estado de pérdidas y ganancias — reglas cerradas
 
 - Estructura contable real, no una resta simple: Ingresos por ventas − Costo de ventas = Utilidad bruta; + otros ingresos − gastos operacionales = Utilidad neta. Todo calculado en `vista_estado_resultados`, con el costo congelado en cada venta (no el costo actual).
-- **Pasivos y deudas por pagar** (tabla `pasivos`) son un concepto contable distinto a la utilidad — un préstamo o una cuenta por pagar no es un gasto operacional. No se restan dentro de `vista_estado_resultados`. Se muestran **al lado** de la utilidad, como su propia sección, para que la persona vea ambas cosas juntas sin mezclar los cálculos.
-- No hace falta que la persona entienda la diferencia contable — simplemente ve "Utilidad neta: $X" y "Deudas pendientes: $Y" como dos números separados en la misma pantalla.
+- **Pasivos y deudas por pagar** (tabla `pasivos`): criterio de caja, no de causación. Crear una deuda no genera ningún gasto por sí sola — ese dinero todavía no ha salido. El gasto real se registra cuando efectivamente se abona o se paga, con la fecha en que ocurrió (la persona la elige, no siempre es "hoy"). Cada abono o pago genera su propio movimiento en `finanzas_movimientos` (categoría `'pago de deuda'`, enlazado a la deuda vía `pasivo_id`) por el monto exacto abonado — así sí impacta `vista_estado_resultados` en el mes correspondiente, sin duplicar: nunca se cuenta la deuda completa de una vez, solo lo que se ha pagado hasta el momento.
+- Cada deuda muestra su historial de abonos (fecha + monto de cada uno) — funciona como "cuotas", aunque todavía no hay un plan de cuotas fijo predefinido (número de pagos, monto por cuota). Eso se agrega cuando haya un caso real que lo necesite — cada negocio maneja sus deudas distinto.
+- No hace falta que la persona entienda la diferencia contable — simplemente ve "Utilidad neta: $X" y "Deudas pendientes: $Y" como dos números separados en la misma pantalla, sabiendo que un abono si mueve ambos números (baja la deuda, y ese mismo abono ya cuenta como gasto del mes en que se hizo).
 - El desglose por producto y categoría (`vista_utilidad_por_producto`, `vista_utilidad_por_categoria`) vive dentro de este módulo, ya construido.
 
 ### Descuentos y promociones — reglas cerradas

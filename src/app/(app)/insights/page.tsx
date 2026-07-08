@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { primeraMayuscula } from "@/lib/texto";
+import { GraficoBarras, GraficoBarrasHorizontal, type Barra } from "./graficos";
 
 type FilaVentaDia = {
   dia: string;
@@ -39,13 +40,35 @@ function formatoMoneda(valor: number) {
   return valor.toLocaleString("es-CO", { style: "currency", currency: "COP" });
 }
 
+function formatoMonedaCorta(valor: number) {
+  return valor.toLocaleString("es-CO", {
+    style: "currency",
+    currency: "COP",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  });
+}
+
 function etiquetaMes(mes: string) {
   return primeraMayuscula(
     new Date(mes).toLocaleDateString("es-CO", { month: "long", year: "numeric" }),
   );
 }
 
+function etiquetaMesCorta(mes: string) {
+  return primeraMayuscula(new Date(mes).toLocaleDateString("es-CO", { month: "short" }));
+}
+
 const ORDEN_DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const ABREVIATURA_DIA: Record<string, string> = {
+  Lunes: "Lun",
+  Martes: "Mar",
+  Miércoles: "Mié",
+  Jueves: "Jue",
+  Viernes: "Vie",
+  Sábado: "Sáb",
+  Domingo: "Dom",
+};
 const UMBRAL_DESVIACION_DIA = 0.2; // 20%
 const UMBRAL_MARGEN_BAJO = 15; // %
 
@@ -118,6 +141,20 @@ export default async function InsightsPage() {
       ? ventasPorDia.reduce((s, f) => s + f.total_vendido, 0) / ventasPorDia.length
       : 0;
 
+  const diasConDatos = porDiaSemana.filter((d) => d.diasConVenta > 0);
+  const mejorDia = diasConDatos.reduce(
+    (mejor, d) => (d.promedio > (mejor?.promedio ?? -Infinity) ? d : mejor),
+    null as (typeof diasConDatos)[number] | null,
+  );
+  const peorDia = diasConDatos.reduce(
+    (peor, d) => (d.promedio < (peor?.promedio ?? Infinity) ? d : peor),
+    null as (typeof diasConDatos)[number] | null,
+  );
+  const mejorDiaDestaca =
+    promedioGeneral > 0 && mejorDia && mejorDia.promedio >= promedioGeneral * (1 + UMBRAL_DESVIACION_DIA);
+  const peorDiaDestaca =
+    promedioGeneral > 0 && peorDia && peorDia.promedio <= promedioGeneral * (1 - UMBRAL_DESVIACION_DIA);
+
   const festivos = ventasPorDia.filter((f) => f.es_festivo);
   const noFestivos = ventasPorDia.filter((f) => !f.es_festivo);
   const promedioFestivo =
@@ -127,33 +164,46 @@ export default async function InsightsPage() {
       ? noFestivos.reduce((s, f) => s + f.total_vendido, 0) / noFestivos.length
       : null;
 
+  // ---- Datos para las gráficas ----
+  const barrasDiaSemana: Barra[] = porDiaSemana.map((d) => ({
+    etiqueta: ABREVIATURA_DIA[d.dia],
+    valor: d.promedio,
+    tono:
+      mejorDiaDestaca && d.dia === mejorDia?.dia
+        ? "positivo"
+        : peorDiaDestaca && d.dia === peorDia?.dia
+          ? "alerta"
+          : "default",
+  }));
+
+  const barrasMes: Barra[] = [...porMes]
+    .sort((a, b) => a.mes.localeCompare(b.mes))
+    .map((f) => ({ etiqueta: etiquetaMesCorta(f.mes), valor: f.utilidad_neta }));
+
+  const barrasMargen: Barra[] = porProducto
+    .filter((p) => p.ingresos > 0)
+    .slice(0, 10)
+    .map((p) => ({
+      etiqueta: p.nombre,
+      valor: p.margen_porcentaje,
+      tono: p.margen_porcentaje < UMBRAL_MARGEN_BAJO ? "alerta" : "default",
+    }));
+
   // ---- Insights: solo lo que cruza un umbral ----
   type Insight = { titulo: string; detalle: string };
   const insights: Insight[] = [];
 
-  if (promedioGeneral > 0) {
-    const diasConDatos = porDiaSemana.filter((d) => d.diasConVenta > 0);
-    const mejorDia = diasConDatos.reduce(
-      (mejor, d) => (d.promedio > (mejor?.promedio ?? -Infinity) ? d : mejor),
-      null as (typeof diasConDatos)[number] | null,
-    );
-    const peorDia = diasConDatos.reduce(
-      (peor, d) => (d.promedio < (peor?.promedio ?? Infinity) ? d : peor),
-      null as (typeof diasConDatos)[number] | null,
-    );
-
-    if (mejorDia && mejorDia.promedio >= promedioGeneral * (1 + UMBRAL_DESVIACION_DIA)) {
-      insights.push({
-        titulo: `Vendes más los ${mejorDia.dia}`,
-        detalle: `Promedias ${formatoMoneda(mejorDia.promedio)} ese día, contra ${formatoMoneda(promedioGeneral)} en un día cualquiera.`,
-      });
-    }
-    if (peorDia && peorDia.promedio <= promedioGeneral * (1 - UMBRAL_DESVIACION_DIA)) {
-      insights.push({
-        titulo: `Vendes menos los ${peorDia.dia}`,
-        detalle: `Promedias ${formatoMoneda(peorDia.promedio)} ese día, contra ${formatoMoneda(promedioGeneral)} en un día cualquiera.`,
-      });
-    }
+  if (mejorDiaDestaca && mejorDia) {
+    insights.push({
+      titulo: `Vendes más los ${mejorDia.dia}`,
+      detalle: `Promedias ${formatoMoneda(mejorDia.promedio)} ese día, contra ${formatoMoneda(promedioGeneral)} en un día cualquiera.`,
+    });
+  }
+  if (peorDiaDestaca && peorDia) {
+    insights.push({
+      titulo: `Vendes menos los ${peorDia.dia}`,
+      detalle: `Promedias ${formatoMoneda(peorDia.promedio)} ese día, contra ${formatoMoneda(promedioGeneral)} en un día cualquiera.`,
+    });
   }
 
   if (promedioFestivo !== null && promedioNoFestivo !== null && promedioNoFestivo > 0) {
@@ -221,28 +271,8 @@ export default async function InsightsPage() {
       <div>
         <h1 className="text-lg font-semibold text-gray-900">Insights</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Lo que vale la pena señalar de tus datos reales — solo aparece cuando algo se sale de
-          lo normal.
+          Primero el panorama general, y debajo lo que vale la pena señalar de tus datos reales.
         </p>
-      </div>
-
-      <div>
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Insights encontrados</h2>
-        {insights.length === 0 ? (
-          <p className="text-sm text-gray-400">
-            Todavía no hay suficientes datos, o todo está dentro de lo normal — no hay nada que
-            señalar por ahora.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {insights.map((insight, i) => (
-              <li key={i} className="rounded-lg border border-gray-200 p-3">
-                <p className="text-sm font-medium text-gray-900">{insight.titulo}</p>
-                <p className="text-xs text-gray-500">{insight.detalle}</p>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
 
       <div>
@@ -251,16 +281,11 @@ export default async function InsightsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-gray-200 p-4">
             <h3 className="mb-3 text-xs font-medium text-gray-700">Ventas por día de la semana</h3>
-            <ul className="divide-y divide-gray-100 text-sm">
-              {porDiaSemana.map((d) => (
-                <li key={d.dia} className="flex justify-between py-1.5">
-                  <span className="text-gray-500">{d.dia}</span>
-                  <span className="text-gray-900">
-                    {d.diasConVenta > 0 ? formatoMoneda(d.promedio) : "—"}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {promedioGeneral > 0 ? (
+              <GraficoBarras datos={barrasDiaSemana} formatoValor={formatoMonedaCorta} />
+            ) : (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            )}
           </div>
 
           <div className="rounded-lg border border-gray-200 p-4">
@@ -284,9 +309,25 @@ export default async function InsightsPage() {
 
         <div className="mt-4 rounded-lg border border-gray-200 p-4">
           <h3 className="mb-3 text-xs font-medium text-gray-700">Margen por producto</h3>
-          {porProducto.length === 0 ? (
+          {barrasMargen.length === 0 ? (
             <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
           ) : (
+            <GraficoBarrasHorizontal datos={barrasMargen} formatoValor={(v) => `${v}%`} />
+          )}
+        </div>
+
+        <div className="mt-4 rounded-lg border border-gray-200 p-4">
+          <h3 className="mb-3 text-xs font-medium text-gray-700">Utilidad por mes</h3>
+          {barrasMes.length === 0 ? (
+            <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
+          ) : (
+            <GraficoBarras datos={barrasMes} formatoValor={formatoMonedaCorta} />
+          )}
+        </div>
+
+        {porProducto.length > 0 && (
+          <div className="mt-4 rounded-lg border border-gray-200 p-4">
+            <h3 className="mb-3 text-xs font-medium text-gray-700">Detalle por producto</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -317,26 +358,27 @@ export default async function InsightsPage() {
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
-        <div className="mt-4 rounded-lg border border-gray-200 p-4">
-          <h3 className="mb-3 text-xs font-medium text-gray-700">Utilidad por mes</h3>
-          {porMes.length === 0 ? (
-            <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100 text-sm">
-              {porMes.map((f) => (
-                <li key={f.mes} className="flex justify-between py-1.5">
-                  <span className="text-gray-500">{etiquetaMes(f.mes)}</span>
-                  <span className={f.utilidad_neta >= 0 ? "text-gray-900" : "text-red-600"}>
-                    {formatoMoneda(f.utilidad_neta)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-gray-900">Insights encontrados</h2>
+        {insights.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            Todavía no hay suficientes datos, o todo está dentro de lo normal — no hay nada que
+            señalar por ahora.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {insights.map((insight, i) => (
+              <li key={i} className="rounded-lg border border-gray-200 p-3">
+                <p className="text-sm font-medium text-gray-900">{insight.titulo}</p>
+                <p className="text-xs text-gray-500">{insight.detalle}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

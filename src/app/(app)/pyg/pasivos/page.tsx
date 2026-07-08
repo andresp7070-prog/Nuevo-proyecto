@@ -29,5 +29,24 @@ export default async function PasivosPage() {
     .eq("empresa_id", perfil.empresa_id)
     .order("fecha_vencimiento", { ascending: true, nullsFirst: false });
 
-  return <DirectorioPasivos pasivos={pasivos ?? []} />;
+  const pasivoIds = (pasivos ?? []).map((p) => p.id);
+
+  const { data: pagosData } =
+    pasivoIds.length > 0
+      ? await supabase
+          .from("finanzas_movimientos")
+          .select("pasivo_id, monto, fecha")
+          .in("pasivo_id", pasivoIds)
+          .order("fecha", { ascending: false })
+      : { data: [] };
+
+  const pagosPorPasivo: Record<string, { monto: number; fecha: string }[]> = {};
+  for (const pago of pagosData ?? []) {
+    if (!pago.pasivo_id) continue;
+    const lista = pagosPorPasivo[pago.pasivo_id] ?? [];
+    lista.push({ monto: pago.monto, fecha: pago.fecha });
+    pagosPorPasivo[pago.pasivo_id] = lista;
+  }
+
+  return <DirectorioPasivos pasivos={pasivos ?? []} pagosPorPasivo={pagosPorPasivo} />;
 }

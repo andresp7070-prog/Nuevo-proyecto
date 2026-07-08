@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ahoraFecha } from "@/lib/fecha";
 import { registrarAbono, marcarPagado } from "./actions";
 
 type Pasivo = {
@@ -14,6 +15,8 @@ type Pasivo = {
   fecha_vencimiento: string | null;
   estado: string;
 };
+
+type Pago = { monto: number; fecha: string };
 
 const etiquetaTipo: Record<string, string> = {
   prestamo: "Préstamo",
@@ -31,9 +34,12 @@ function estaVencido(pasivo: Pasivo) {
   return new Date(pasivo.fecha_vencimiento) < new Date(new Date().toDateString());
 }
 
-function FilaPasivo({ pasivo }: { pasivo: Pasivo }) {
+function FilaPasivo({ pasivo, pagos }: { pasivo: Pasivo; pagos: Pago[] }) {
   const router = useRouter();
   const [abono, setAbono] = useState("");
+  const [fechaAbono, setFechaAbono] = useState(ahoraFecha());
+  const [fechaPago, setFechaPago] = useState(ahoraFecha());
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +53,7 @@ function FilaPasivo({ pasivo }: { pasivo: Pasivo }) {
       return;
     }
     setProcesando(true);
-    const resultado = await registrarAbono({ pasivoId: pasivo.id, monto });
+    const resultado = await registrarAbono({ pasivoId: pasivo.id, monto, fecha: fechaAbono });
     setProcesando(false);
     if (resultado.error) {
       setError(resultado.error);
@@ -59,7 +65,7 @@ function FilaPasivo({ pasivo }: { pasivo: Pasivo }) {
 
   async function pagarTodo() {
     setProcesando(true);
-    const resultado = await marcarPagado(pasivo.id);
+    const resultado = await marcarPagado({ pasivoId: pasivo.id, fecha: fechaPago });
     setProcesando(false);
     if (resultado.error) {
       setError(resultado.error);
@@ -102,7 +108,13 @@ function FilaPasivo({ pasivo }: { pasivo: Pasivo }) {
             onChange={(e) => setAbono(e.target.value.replace(/\D/g, ""))}
             placeholder="Abono"
             inputMode="numeric"
-            className="w-28 rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-24 rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
+          />
+          <input
+            type="date"
+            value={fechaAbono}
+            onChange={(e) => setFechaAbono(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
           />
           <button
             type="button"
@@ -112,6 +124,13 @@ function FilaPasivo({ pasivo }: { pasivo: Pasivo }) {
           >
             Registrar abono
           </button>
+          <span className="text-gray-300">|</span>
+          <input
+            type="date"
+            value={fechaPago}
+            onChange={(e) => setFechaPago(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
+          />
           <button
             type="button"
             onClick={pagarTodo}
@@ -123,11 +142,39 @@ function FilaPasivo({ pasivo }: { pasivo: Pasivo }) {
         </div>
       )}
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+
+      {pagos.length > 0 && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setMostrarHistorial((v) => !v)}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            {mostrarHistorial ? "Ocultar" : "Ver"} historial de pagos ({pagos.length})
+          </button>
+          {mostrarHistorial && (
+            <ul className="mt-1 space-y-1 border-l-2 border-gray-100 pl-3 text-xs text-gray-500">
+              {pagos.map((p, i) => (
+                <li key={i} className="flex justify-between">
+                  <span>{p.fecha}</span>
+                  <span>{formatoMoneda(p.monto)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </li>
   );
 }
 
-export function DirectorioPasivos({ pasivos }: { pasivos: Pasivo[] }) {
+export function DirectorioPasivos({
+  pasivos,
+  pagosPorPasivo,
+}: {
+  pasivos: Pasivo[];
+  pagosPorPasivo: Record<string, Pago[]>;
+}) {
   const pendientes = pasivos.filter((p) => p.estado !== "pagado");
   const pagados = pasivos.filter((p) => p.estado === "pagado");
   const totalPendiente = pendientes.reduce((s, p) => s + (p.monto_total - p.monto_pagado), 0);
@@ -158,7 +205,7 @@ export function DirectorioPasivos({ pasivos }: { pasivos: Pasivo[] }) {
       ) : (
         <ul className="mb-6 divide-y divide-gray-100 rounded-lg border border-gray-200 px-4">
           {pendientes.map((p) => (
-            <FilaPasivo key={p.id} pasivo={p} />
+            <FilaPasivo key={p.id} pasivo={p} pagos={pagosPorPasivo[p.id] ?? []} />
           ))}
         </ul>
       )}
@@ -168,7 +215,7 @@ export function DirectorioPasivos({ pasivos }: { pasivos: Pasivo[] }) {
           <h2 className="mb-2 text-sm font-semibold text-gray-900">Pagadas</h2>
           <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 px-4">
             {pagados.map((p) => (
-              <FilaPasivo key={p.id} pasivo={p} />
+              <FilaPasivo key={p.id} pasivo={p} pagos={pagosPorPasivo[p.id] ?? []} />
             ))}
           </ul>
         </>

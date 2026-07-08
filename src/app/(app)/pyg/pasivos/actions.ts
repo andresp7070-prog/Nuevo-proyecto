@@ -39,6 +39,7 @@ export async function crearPasivo(input: {
 export async function registrarAbono(input: {
   pasivoId: string;
   monto: number;
+  fecha: string;
 }): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {
@@ -48,7 +49,7 @@ export async function registrarAbono(input: {
 
   const { data: pasivo, error: errorLectura } = await supabase
     .from("pasivos")
-    .select("monto_total, monto_pagado")
+    .select("empresa_id, descripcion, monto_total, monto_pagado")
     .eq("id", input.pasivoId)
     .single();
 
@@ -56,7 +57,9 @@ export async function registrarAbono(input: {
     return { error: errorLectura?.message ?? "No se encontró la deuda." };
   }
 
-  const nuevoPagado = Math.min(pasivo.monto_pagado + input.monto, pasivo.monto_total);
+  const saldoRestante = pasivo.monto_total - pasivo.monto_pagado;
+  const montoAplicado = Math.min(input.monto, saldoRestante);
+  const nuevoPagado = pasivo.monto_pagado + montoAplicado;
   const nuevoEstado = nuevoPagado >= pasivo.monto_total ? "pagado" : "pendiente";
 
   const { error } = await supabase
@@ -65,10 +68,25 @@ export async function registrarAbono(input: {
     .eq("id", input.pasivoId);
 
   if (error) return { error: error.message };
+
+  const { error: errorGasto } = await supabase.from("finanzas_movimientos").insert({
+    empresa_id: pasivo.empresa_id,
+    tipo: "gasto",
+    categoria: "pago de deuda",
+    monto: montoAplicado,
+    fecha: input.fecha,
+    nota: `Abono a "${pasivo.descripcion}"`,
+    pasivo_id: input.pasivoId,
+  });
+
+  if (errorGasto) return { error: errorGasto.message };
   return { error: null };
 }
 
-export async function marcarPagado(pasivoId: string): Promise<{ error: string | null }> {
+export async function marcarPagado(input: {
+  pasivoId: string;
+  fecha: string;
+}): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -77,19 +95,36 @@ export async function marcarPagado(pasivoId: string): Promise<{ error: string | 
 
   const { data: pasivo, error: errorLectura } = await supabase
     .from("pasivos")
-    .select("monto_total")
-    .eq("id", pasivoId)
+    .select("empresa_id, descripcion, monto_total, monto_pagado")
+    .eq("id", input.pasivoId)
     .single();
 
   if (errorLectura || !pasivo) {
     return { error: errorLectura?.message ?? "No se encontró la deuda." };
   }
 
+  const saldoRestante = pasivo.monto_total - pasivo.monto_pagado;
+
   const { error } = await supabase
     .from("pasivos")
     .update({ monto_pagado: pasivo.monto_total, estado: "pagado" })
-    .eq("id", pasivoId);
+    .eq("id", input.pasivoId);
 
   if (error) return { error: error.message };
+
+  if (saldoRestante > 0) {
+    const { error: errorGasto } = await supabase.from("finanzas_movimientos").insert({
+      empresa_id: pasivo.empresa_id,
+      tipo: "gasto",
+      categoria: "pago de deuda",
+      monto: saldoRestante,
+      fecha: input.fecha,
+      nota: `Pago final de "${pasivo.descripcion}"`,
+      pasivo_id: input.pasivoId,
+    });
+
+    if (errorGasto) return { error: errorGasto.message };
+  }
+
   return { error: null };
 }
