@@ -4,21 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const PESTANAS = [
-  { href: "/inventario", etiqueta: "Productos" },
-  { href: "/inventario/recetas", etiqueta: "Recetas" },
-  { href: "/inventario/proyecciones", etiqueta: "Proyecciones" },
+  { href: "/pyg", etiqueta: "Resumen" },
+  { href: "/pyg/proyecciones", etiqueta: "Proyecciones" },
 ];
 
-export function InventarioTabs() {
+export function PygTabs() {
   const pathname = usePathname();
 
   return (
     <div className="mb-6 flex gap-4 border-b border-gray-200">
       {PESTANAS.map((pestana) => {
         const activa =
-          pestana.href === "/inventario"
-            ? pathname === "/inventario"
-            : pathname.startsWith(pestana.href);
+          pestana.href === "/pyg" ? pathname === "/pyg" : pathname.startsWith(pestana.href);
         return (
           <Link
             key={pestana.href}

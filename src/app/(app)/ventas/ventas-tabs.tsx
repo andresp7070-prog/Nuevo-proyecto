@@ -4,21 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const PESTANAS = [
-  { href: "/inventario", etiqueta: "Productos" },
-  { href: "/inventario/recetas", etiqueta: "Recetas" },
-  { href: "/inventario/proyecciones", etiqueta: "Proyecciones" },
+  { href: "/ventas", etiqueta: "Historial" },
+  { href: "/ventas/proyecciones", etiqueta: "Proyecciones" },
 ];
 
-export function InventarioTabs() {
+export function VentasTabs() {
   const pathname = usePathname();
 
   return (
     <div className="mb-6 flex gap-4 border-b border-gray-200">
       {PESTANAS.map((pestana) => {
         const activa =
-          pestana.href === "/inventario"
-            ? pathname === "/inventario"
-            : pathname.startsWith(pestana.href);
+          pestana.href === "/ventas" ? pathname === "/ventas" : pathname.startsWith(pestana.href);
         return (
           <Link
             key={pestana.href}

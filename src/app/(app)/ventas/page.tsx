@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { VentasTabs } from "./ventas-tabs";
 
 type ItemLinea = {
   cantidad: number;
@@ -66,6 +67,8 @@ export default async function VentasPage({
 
   return (
     <div>
+      <VentasTabs />
+
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Ventas</h1>
         <Link

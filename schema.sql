@@ -404,6 +404,23 @@ left join ventas_items vi on vi.venta_id = v.id
 group by v.id, v.empresa_id, v.fecha, v.monto, v.contacto_id;
 
 -- ------------------------------------------------------------
+-- Vista: Velocidad de venta reciente por producto — unidades
+-- vendidas por día, promediado sobre los últimos 30 días. Alimenta
+-- la pestaña "Proyecciones" de Inventario: cantidad disponible ÷
+-- esto = días de stock que quedan al ritmo de venta actual.
+-- ------------------------------------------------------------
+create or replace view vista_velocidad_ventas as
+select
+  i.empresa_id,
+  vi.item_id,
+  round(sum(vi.cantidad) / 30.0, 4) as unidades_por_dia
+from ventas_items vi
+join ventas v on v.id = vi.venta_id
+join inventario_items i on i.id = vi.item_id
+where v.fecha >= now() - interval '30 days'
+group by i.empresa_id, vi.item_id;
+
+-- ------------------------------------------------------------
 -- Festivos de Colombia — tabla de referencia, compartida por
 -- todas las empresas (no es un dato de ninguna en particular,
 -- por eso no lleva empresa_id ni Row Level Security).

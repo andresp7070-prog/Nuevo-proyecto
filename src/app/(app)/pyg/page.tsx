@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { primeraMayuscula } from "@/lib/texto";
+import { PygTabs } from "./pyg-tabs";
 
 type FilaResultados = {
   mes: string;
@@ -136,6 +137,8 @@ export default async function PygPage({
 
   return (
     <div className="space-y-6">
+      <PygTabs />
+
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Estado de pérdidas y ganancias</h1>
         <div className="flex gap-2">
