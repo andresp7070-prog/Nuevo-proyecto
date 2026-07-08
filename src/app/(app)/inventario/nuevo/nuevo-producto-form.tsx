@@ -6,6 +6,7 @@ import Link from "next/link";
 import { sinTildes, primeraMayuscula } from "@/lib/texto";
 import { UNIDADES } from "@/lib/unidades";
 import { CampoMoneda } from "@/components/campo-moneda";
+import { errorTamanoFoto } from "@/lib/fotos";
 import { RecetaLineas, type LineaRecetaValor } from "../receta-lineas";
 import { guardarReceta, subirFotoProducto } from "../[id]/actions";
 import { crearProducto, reabastecerProducto } from "./actions";
@@ -55,6 +56,7 @@ export function NuevoProductoForm({
   const [contenidoPorUnidad, setContenidoPorUnidad] = useState("");
   const [receta, setReceta] = useState<LineaRecetaValor[]>([]);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
 
   const insumosDisponibles = items
     .filter((item) => item.id !== itemExistente?.id)
@@ -119,6 +121,7 @@ export function NuevoProductoForm({
     setPrecioVenta("");
     setContenidoPorUnidad("");
     setFotoFile(null);
+    setErrorFoto(null);
   }
 
   async function subirFotoSiHay(itemId: string): Promise<string | null> {
@@ -328,9 +331,23 @@ export function NuevoProductoForm({
       <input
         type="file"
         accept="image/png,image/jpeg,image/webp"
-        onChange={(e) => setFotoFile(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          const file = e.target.files?.[0] ?? null;
+          if (file) {
+            const errorValidacion = errorTamanoFoto(file);
+            if (errorValidacion) {
+              setErrorFoto(errorValidacion);
+              setFotoFile(null);
+              e.target.value = "";
+              return;
+            }
+          }
+          setErrorFoto(null);
+          setFotoFile(file);
+        }}
         className="w-full rounded border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1 file:text-sm"
       />
+      {errorFoto && <p className="mt-1 text-xs text-red-600">{errorFoto}</p>}
     </div>
   );
 

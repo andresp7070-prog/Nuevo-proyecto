@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { errorTamanoFoto } from "@/lib/fotos";
 import { subirFotoProducto } from "./actions";
 
 export function FotoProducto({ itemId, fotoUrl }: { itemId: string; fotoUrl: string | null }) {
@@ -40,7 +41,7 @@ export function FotoProducto({ itemId, fotoUrl }: { itemId: string; fotoUrl: str
         />
       ) : (
         <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-gray-300 text-xs text-gray-400">
-          Sin foto
+          {subiendo ? "Subiendo..." : "Sin foto"}
         </div>
       )}
       <input
@@ -49,12 +50,19 @@ export function FotoProducto({ itemId, fotoUrl }: { itemId: string; fotoUrl: str
         accept="image/png,image/jpeg,image/webp"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) subir(file);
+          if (!file) return;
+          const errorValidacion = errorTamanoFoto(file);
+          if (errorValidacion) {
+            setError(errorValidacion);
+            if (inputRef.current) inputRef.current.value = "";
+            return;
+          }
+          subir(file);
         }}
         disabled={subiendo}
         className="w-24 text-xs file:mr-1 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs"
       />
-      {error && <p className="max-w-24 text-center text-xs text-red-600">{error}</p>}
+      {error && <p className="max-w-32 text-center text-xs text-red-600">{error}</p>}
     </div>
   );
 }

@@ -3,6 +3,15 @@ import type { createClient } from "@/lib/supabase/server";
 const BUCKET = "inventario-fotos";
 const EXPIRA_SEGUNDOS = 3600;
 
+export const TAMANO_MAXIMO_FOTO_BYTES = 5 * 1024 * 1024;
+
+export function errorTamanoFoto(file: File): string | null {
+  if (file.size > TAMANO_MAXIMO_FOTO_BYTES) {
+    return "La foto pesa más de 5MB — elige una más liviana.";
+  }
+  return null;
+}
+
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 export async function firmarFotoUrl(
