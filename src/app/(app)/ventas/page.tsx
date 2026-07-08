@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { VentasTabs } from "./ventas-tabs";
+import { DescargarCsv } from "@/components/descargar-csv";
 
 type ItemLinea = {
   cantidad: number;
@@ -65,18 +66,41 @@ export default async function VentasPage({
   const totalVentas = ventas.length;
   const totalVendido = ventas.reduce((suma, venta) => suma + Number(venta.monto), 0);
 
+  const filasCsv = ventas.map((venta) => ({
+    fecha: new Date(venta.fecha).toLocaleString("es-CO"),
+    cliente: venta.cliente_nombre ?? "",
+    monto: Number(venta.monto),
+    metodo_pago: venta.metodo_pago ? (etiquetaMetodoPago[venta.metodo_pago] ?? venta.metodo_pago) : "",
+    productos: venta.ventas_items
+      .map((item) => `${item.inventario_items?.nombre ?? "Producto eliminado"} x${item.cantidad}`)
+      .join("; "),
+  }));
+
   return (
     <div>
       <VentasTabs />
 
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Ventas</h1>
-        <Link
-          href="/ventas/nueva"
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-        >
-          Agregar venta
-        </Link>
+        <div className="flex gap-2">
+          <DescargarCsv
+            filas={filasCsv}
+            columnas={[
+              { clave: "fecha", titulo: "Fecha" },
+              { clave: "cliente", titulo: "Cliente" },
+              { clave: "monto", titulo: "Monto" },
+              { clave: "metodo_pago", titulo: "Método de pago" },
+              { clave: "productos", titulo: "Productos" },
+            ]}
+            nombreArchivo="ventas.csv"
+          />
+          <Link
+            href="/ventas/nueva"
+            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            Agregar venta
+          </Link>
+        </div>
       </div>
 
       {guardada === "1" && (

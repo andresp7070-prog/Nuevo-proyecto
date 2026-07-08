@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { primeraMayuscula } from "@/lib/texto";
 import { PygTabs } from "./pyg-tabs";
+import { DescargarCsv } from "@/components/descargar-csv";
 
 type FilaResultados = {
   mes: string;
@@ -135,6 +136,24 @@ export default async function PygPage({
 
   const porProducto = (porProductoData ?? []) as FilaProducto[];
 
+  const filasCsvCategoria = porCategoria.map((c) => ({
+    categoria: c.categoria || "Sin categoría",
+    unidades: c.unidades_vendidas,
+    ingresos: c.ingresos,
+    costos: c.costos,
+    utilidad: c.utilidad,
+    margen: c.margen_porcentaje,
+  }));
+
+  const filasCsvProducto = porProducto.map((p) => ({
+    producto: p.nombre,
+    unidades: p.unidades_vendidas,
+    ingresos: p.ingresos,
+    costos: p.costos,
+    utilidad: p.utilidad,
+    margen: p.margen_porcentaje,
+  }));
+
   return (
     <div className="space-y-6">
       <PygTabs />
@@ -238,7 +257,21 @@ export default async function PygPage({
       </div>
 
       <div className="rounded-lg border border-gray-200 p-4">
-        <h2 className="mb-4 text-sm font-semibold text-gray-900">Utilidad por categoría</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900">Utilidad por categoría</h2>
+          <DescargarCsv
+            filas={filasCsvCategoria}
+            columnas={[
+              { clave: "categoria", titulo: "Categoría" },
+              { clave: "unidades", titulo: "Unidades" },
+              { clave: "ingresos", titulo: "Ingresos" },
+              { clave: "costos", titulo: "Costos" },
+              { clave: "utilidad", titulo: "Utilidad" },
+              { clave: "margen", titulo: "Margen %" },
+            ]}
+            nombreArchivo="utilidad-por-categoria.csv"
+          />
+        </div>
         {porCategoria.length === 0 ? (
           <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
         ) : (
@@ -272,7 +305,21 @@ export default async function PygPage({
       </div>
 
       <div className="rounded-lg border border-gray-200 p-4">
-        <h2 className="mb-4 text-sm font-semibold text-gray-900">Utilidad por producto</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900">Utilidad por producto</h2>
+          <DescargarCsv
+            filas={filasCsvProducto}
+            columnas={[
+              { clave: "producto", titulo: "Producto" },
+              { clave: "unidades", titulo: "Unidades" },
+              { clave: "ingresos", titulo: "Ingresos" },
+              { clave: "costos", titulo: "Costos" },
+              { clave: "utilidad", titulo: "Utilidad" },
+              { clave: "margen", titulo: "Margen %" },
+            ]}
+            nombreArchivo="utilidad-por-producto.csv"
+          />
+        </div>
         {porProducto.length === 0 ? (
           <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
         ) : (

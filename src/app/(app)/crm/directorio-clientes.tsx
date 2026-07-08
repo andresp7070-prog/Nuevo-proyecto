@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { sinTildes } from "@/lib/texto";
+import { DescargarCsv } from "@/components/descargar-csv";
 
 type Contacto = {
   id: string;
   nombre: string;
   telefono: string | null;
+  email: string | null;
   etapa_pipeline: string;
   empresa_cliente: string | null;
 };
@@ -41,16 +43,37 @@ export function DirectorioClientes({ contactos }: { contactos: Contacto[] }) {
     return coincideEtapa && coincideTexto;
   });
 
+  const filasCsv = filtrados.map((contacto) => ({
+    nombre: contacto.nombre,
+    telefono: contacto.telefono ?? "",
+    email: contacto.email ?? "",
+    etapa: etiquetaEtapa[contacto.etapa_pipeline] ?? contacto.etapa_pipeline,
+    empresa: contacto.empresa_cliente ?? "",
+  }));
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">CRM</h1>
-        <Link
-          href="/crm/nuevo"
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-        >
-          Agregar cliente
-        </Link>
+        <div className="flex gap-2">
+          <DescargarCsv
+            filas={filasCsv}
+            columnas={[
+              { clave: "nombre", titulo: "Nombre" },
+              { clave: "telefono", titulo: "Teléfono" },
+              { clave: "email", titulo: "Correo" },
+              { clave: "etapa", titulo: "Etapa" },
+              { clave: "empresa", titulo: "Empresa" },
+            ]}
+            nombreArchivo="clientes.csv"
+          />
+          <Link
+            href="/crm/nuevo"
+            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            Agregar cliente
+          </Link>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">

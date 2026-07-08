@@ -5,6 +5,7 @@ import Link from "next/link";
 import { sinTildes } from "@/lib/texto";
 import { etiquetaUnidad } from "@/lib/unidades";
 import { InventarioTabs } from "./inventario-tabs";
+import { DescargarCsv } from "@/components/descargar-csv";
 
 type Item = {
   id: string;
@@ -42,18 +43,43 @@ export function DirectorioInventario({
     );
   });
 
+  const filasCsv = filtrados.map((item) => ({
+    nombre: item.nombre,
+    categoria: item.categoria ?? "",
+    marca: item.marca ?? "",
+    unidad: etiquetaUnidad(item.unidad),
+    cantidad: item.disponible !== null ? item.disponible : item.cantidad,
+    costo: item.costo ?? "",
+    precio_venta: item.precio_venta ?? "",
+  }));
+
   return (
     <div>
       <InventarioTabs />
 
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Inventario</h1>
-        <Link
-          href="/inventario/nuevo"
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-        >
-          Agregar producto
-        </Link>
+        <div className="flex gap-2">
+          <DescargarCsv
+            filas={filasCsv}
+            columnas={[
+              { clave: "nombre", titulo: "Nombre" },
+              { clave: "categoria", titulo: "Categoría" },
+              { clave: "marca", titulo: "Marca" },
+              { clave: "unidad", titulo: "Unidad" },
+              { clave: "cantidad", titulo: "Cantidad" },
+              { clave: "costo", titulo: "Costo" },
+              { clave: "precio_venta", titulo: "Precio de venta" },
+            ]}
+            nombreArchivo="inventario.csv"
+          />
+          <Link
+            href="/inventario/nuevo"
+            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            Agregar producto
+          </Link>
+        </div>
       </div>
 
       {creado && (
