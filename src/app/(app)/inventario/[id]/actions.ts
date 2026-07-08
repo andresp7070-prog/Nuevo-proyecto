@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { reemplazarReceta } from "@/lib/inventario";
+import { errorTamanoFoto } from "@/lib/fotos";
 
 export async function guardarReceta(input: {
   itemResultanteId: string;
@@ -49,6 +50,8 @@ export async function subirFotoProducto(
   if (!(foto instanceof File) || foto.size === 0) {
     return { error: "No se seleccionó ninguna foto." };
   }
+  const errorValidacion = errorTamanoFoto(foto);
+  if (errorValidacion) return { error: errorValidacion };
 
   const extension = foto.name.split(".").pop() ?? "jpg";
   const path = `${perfil.empresa_id}/${itemId}/${Date.now()}.${extension}`;
