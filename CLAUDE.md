@@ -99,6 +99,16 @@ Definida con el caso base de un negocio de productos de aseo del hogar (sin serv
 
 Sin construir aún (Fase 4). Pero ya queda establecido el principio: los insights se calculan sobre los datos reales de ventas, CRM, inventario, P y G y promociones — nunca son un texto genérico ni igual para todas las empresas. Un insight vale la pena si cambia cuando cambian los datos. Cuando lleguemos a esta fase, cada insight debe poder explicarse con una consulta concreta sobre las tablas y vistas que ya existen, no con lógica inventada aparte.
 
+### Migración de datos — reglas cerradas
+
+Para cuando una empresa nueva viene de otra herramienta (Siigo, Alegra, una hoja de Excel a mano) y no quiere perder su historial. No construir esto antes de la Fase 6 (piloto real) — es para el momento de onboarding de un cliente externo, no antes.
+
+- **Basado en plantillas, no en detección automática de columnas.** Le damos al cliente (o resolvemos nosotros durante la implementación) un CSV con columnas fijas por tipo de dato. Es más simple de construir y más seguro con datos financieros reales que intentar adivinar qué significa cada columna de un archivo ajeno.
+- **Las ventas históricas nunca descuentan inventario.** Usan `importar_ventas_historicas()`, que desactiva el disparador de descuento mientras corre — esas ventas ya pasaron en la realidad con el sistema anterior del cliente, descontar de nuevo sería duplicar el efecto.
+- **El inventario actual se carga aparte**, con `cargar_inventario_inicial()` — es una foto de "cuánto hay hoy", no un historial de movimientos. Los productos deben existir ya en el catálogo (dados de alta con nombre, costo, precio de venta) antes de correr esto.
+- **Los clientes importados** (`importar_clientes()`) usan `on conflict do nothing` sobre `(empresa_id, telefono)` — si el archivo se sube dos veces por error, no crea duplicados.
+- Cuando se construya la pantalla de importación, siempre debe mostrar una vista previa de lo que se va a importar antes de confirmar — nunca una carga a ciegas.
+
 ## Los módulos del producto, y su estado
 | Módulo | Estado |
 |---|---|
@@ -116,6 +126,7 @@ Sin construir aún (Fase 4). Pero ya queda establecido el principio: los insight
 3. Inventario + Estado de pérdidas y ganancias (incluye utilidad por producto y por categoría)
 4. Proyecciones + Insights
 5. Descuentos y promociones
+6. Migración de datos (pantalla de importación) — solo al llegar al primer cliente piloto real, no antes
 
 No adelantes fases sin que yo lo pida. Prefiero un módulo bien hecho que cinco a medias. Dentro de cada fase, primero la lógica y los datos correctos, las gráficas y visualizaciones van al final.
 
