@@ -17,6 +17,7 @@ type Item = {
   precio_venta: number | null;
   marca: string | null;
   disponible: number | null;
+  fotoUrl: string | null;
 };
 
 function formatoMoneda(valor: number | null) {
@@ -105,11 +106,23 @@ export function DirectorioInventario({
                 href={`/inventario/${item.id}`}
                 className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
               >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{item.nombre}</p>
-                  <p className="text-xs text-gray-400">
-                    {[item.categoria, item.marca].filter(Boolean).join(" · ") || "Sin categoría"}
-                  </p>
+                <div className="flex items-center gap-3">
+                  {item.fotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.fotoUrl}
+                      alt=""
+                      className="h-10 w-10 shrink-0 rounded border border-gray-200 object-cover"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 shrink-0 rounded border border-dashed border-gray-200" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{item.nombre}</p>
+                    <p className="text-xs text-gray-400">
+                      {[item.categoria, item.marca].filter(Boolean).join(" · ") || "Sin categoría"}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-6 text-right text-sm">
                   <div>

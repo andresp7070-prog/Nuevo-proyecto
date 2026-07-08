@@ -126,6 +126,7 @@ create table inventario_items (
   cantidad numeric(12,2) default 0,
   costo numeric(12,2),
   precio_venta numeric(12,2),
+  foto_path text,  -- ruta dentro del bucket 'inventario-fotos' de Supabase Storage; opcional
   atributos jsonb default '{}',  -- lo que varía por tipo de negocio: fecha de vencimiento, modelo compatible, etc.
   created_at timestamptz default now()
 );
@@ -699,6 +700,40 @@ create policy "ver productos de mis promociones" on promocion_items
   for all using (
     promocion_id in (select id from promociones where empresa_id = mi_empresa_id())
     or es_admin()
+  );
+
+-- ============================================================
+-- STORAGE — fotos de productos
+-- Bucket privado: cada empresa solo puede ver y subir fotos dentro de su
+-- propia carpeta ('{empresa_id}/{item_id}/archivo'). Límite de 5MB por foto,
+-- solo formatos de imagen comunes.
+-- ============================================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('inventario-fotos', 'inventario-fotos', false, 5242880, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do nothing;
+
+create policy "ver fotos de mi empresa" on storage.objects
+  for select using (
+    bucket_id = 'inventario-fotos'
+    and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
+  );
+
+create policy "subir fotos de mi empresa" on storage.objects
+  for insert with check (
+    bucket_id = 'inventario-fotos'
+    and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
+  );
+
+create policy "actualizar fotos de mi empresa" on storage.objects
+  for update using (
+    bucket_id = 'inventario-fotos'
+    and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
+  );
+
+create policy "borrar fotos de mi empresa" on storage.objects
+  for delete using (
+    bucket_id = 'inventario-fotos'
+    and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
   );
 
 -- ============================================================

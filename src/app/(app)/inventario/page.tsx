@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { calcularMaxProducible } from "@/lib/inventario";
+import { firmarFotoUrls } from "@/lib/fotos";
 import { DirectorioInventario } from "./directorio-inventario";
 
 export default async function InventarioPage({
@@ -32,9 +33,16 @@ export default async function InventarioPage({
 
   const { data: items } = await supabase
     .from("inventario_items")
-    .select("id, nombre, categoria, unidad, cantidad, costo, precio_venta, marca:atributos->>marca")
+    .select(
+      "id, nombre, categoria, unidad, cantidad, costo, precio_venta, foto_path, marca:atributos->>marca",
+    )
     .eq("empresa_id", perfil.empresa_id)
     .order("nombre");
+
+  const fotoUrlsPorPath = await firmarFotoUrls(
+    supabase,
+    (items ?? []).map((item) => item.foto_path),
+  );
 
   const itemIds = (items ?? []).map((item) => item.id);
 
@@ -66,6 +74,7 @@ export default async function InventarioPage({
   const itemsConDisponible = (items ?? []).map((item) => ({
     ...item,
     disponible: calcularMaxProducible(recetaPorItem[item.id] ?? []),
+    fotoUrl: item.foto_path ? (fotoUrlsPorPath[item.foto_path] ?? null) : null,
   }));
 
   return <DirectorioInventario items={itemsConDisponible} creado={creado === "1"} />;

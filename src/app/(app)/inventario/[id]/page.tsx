@@ -3,6 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { etiquetaUnidad } from "@/lib/unidades";
 import { calcularMaxProducible } from "@/lib/inventario";
+import { firmarFotoUrl } from "@/lib/fotos";
+import { FotoProducto } from "./foto-producto";
 
 type RecetaFila = {
   cantidad_insumo: number;
@@ -30,12 +32,14 @@ export default async function FichaProductoPage({
   const { data: item } = await supabase
     .from("inventario_items")
     .select(
-      "id, nombre, categoria, unidad, cantidad, costo, precio_venta, marca:atributos->>marca, contenido_por_unidad:atributos->>contenido_por_unidad",
+      "id, nombre, categoria, unidad, cantidad, costo, precio_venta, foto_path, marca:atributos->>marca, contenido_por_unidad:atributos->>contenido_por_unidad",
     )
     .eq("id", id)
     .single();
 
   if (!item) notFound();
+
+  const fotoUrl = await firmarFotoUrl(supabase, item.foto_path);
 
   const { data } = await supabase
     .from("inventario_receta")
@@ -56,17 +60,20 @@ export default async function FichaProductoPage({
   return (
     <div className="max-w-2xl space-y-6">
       <div className="rounded-lg border border-gray-200 p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">{item.nombre}</h1>
-            <p className="text-sm text-gray-500">
-              {[item.categoria, item.marca].filter(Boolean).join(" · ") || "Sin categoría"}
-            </p>
-            {item.contenido_por_unidad && (
-              <p className="mt-1 text-xs text-gray-400">
-                Cada unidad: {item.contenido_por_unidad} {etiquetaUnidad(item.unidad)}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <FotoProducto itemId={item.id} fotoUrl={fotoUrl} />
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">{item.nombre}</h1>
+              <p className="text-sm text-gray-500">
+                {[item.categoria, item.marca].filter(Boolean).join(" · ") || "Sin categoría"}
               </p>
-            )}
+              {item.contenido_por_unidad && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Cada unidad: {item.contenido_por_unidad} {etiquetaUnidad(item.unidad)}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             <Link

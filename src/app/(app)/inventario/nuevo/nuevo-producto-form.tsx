@@ -7,7 +7,7 @@ import { sinTildes, primeraMayuscula } from "@/lib/texto";
 import { UNIDADES } from "@/lib/unidades";
 import { CampoMoneda } from "@/components/campo-moneda";
 import { RecetaLineas, type LineaRecetaValor } from "../receta-lineas";
-import { guardarReceta } from "../[id]/actions";
+import { guardarReceta, subirFotoProducto } from "../[id]/actions";
 import { crearProducto, reabastecerProducto } from "./actions";
 
 type ItemExistente = {
@@ -54,6 +54,7 @@ export function NuevoProductoForm({
   const [precioVenta, setPrecioVenta] = useState("");
   const [contenidoPorUnidad, setContenidoPorUnidad] = useState("");
   const [receta, setReceta] = useState<LineaRecetaValor[]>([]);
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
 
   const insumosDisponibles = items
     .filter((item) => item.id !== itemExistente?.id)
@@ -117,6 +118,16 @@ export function NuevoProductoForm({
     setCosto("");
     setPrecioVenta("");
     setContenidoPorUnidad("");
+    setFotoFile(null);
+  }
+
+  async function subirFotoSiHay(itemId: string): Promise<string | null> {
+    if (!fotoFile) return null;
+    const formData = new FormData();
+    formData.set("itemId", itemId);
+    formData.set("foto", fotoFile);
+    const resultado = await subirFotoProducto(formData);
+    return resultado.error;
   }
 
   async function guardar() {
@@ -170,6 +181,7 @@ export function NuevoProductoForm({
           setError(resultado.error);
           return;
         }
+        const errorFoto = await subirFotoSiHay(itemExistente.id);
         if (volverAReceta) {
           if (receta.length > 0) {
             const resultadoReceta = await guardarReceta({
@@ -184,7 +196,11 @@ export function NuevoProductoForm({
           router.push(`/inventario/${itemExistente.id}`);
           return;
         }
-        setMensajeExito(`"${nombreFinal}" reabastecido correctamente.`);
+        setMensajeExito(
+          errorFoto
+            ? `"${nombreFinal}" reabastecido correctamente, pero la foto no se pudo subir: ${errorFoto}`
+            : `"${nombreFinal}" reabastecido correctamente.`,
+        );
         reiniciarFormulario();
         router.refresh();
       } else {
@@ -204,6 +220,7 @@ export function NuevoProductoForm({
           setError(resultado.error ?? "No se pudo guardar el producto.");
           return;
         }
+        const errorFoto = await subirFotoSiHay(resultado.id);
         if (volverAReceta) {
           if (receta.length > 0) {
             const resultadoReceta = await guardarReceta({
@@ -218,7 +235,11 @@ export function NuevoProductoForm({
           router.push(`/inventario/${resultado.id}`);
           return;
         }
-        setMensajeExito(`"${nombreFinal}" creado correctamente.`);
+        setMensajeExito(
+          errorFoto
+            ? `"${nombreFinal}" creado correctamente, pero la foto no se pudo subir: ${errorFoto}`
+            : `"${nombreFinal}" creado correctamente.`,
+        );
         reiniciarFormulario();
         router.refresh();
       }
@@ -298,6 +319,18 @@ export function NuevoProductoForm({
           ))}
         </ul>
       )}
+    </div>
+  );
+
+  const campoFoto = (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">Foto (opcional)</label>
+      <input
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={(e) => setFotoFile(e.target.files?.[0] ?? null)}
+        className="w-full rounded border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1 file:text-sm"
+      />
     </div>
   );
 
@@ -476,6 +509,7 @@ export function NuevoProductoForm({
             {campoUnidad}
             {campoContenido}
             {campoCantidad}
+            {campoFoto}
             <p className="text-xs text-gray-400">* Campos obligatorios</p>
           </div>
         </div>
@@ -487,6 +521,7 @@ export function NuevoProductoForm({
           {campoCantidad}
           {campoCosto}
           {campoPrecioVenta}
+          {campoFoto}
           <p className="text-xs text-gray-400">* Campos obligatorios</p>
         </div>
       )}
