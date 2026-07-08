@@ -10,6 +10,7 @@ const modulos = [
   { nombre: "Inventario", href: "/inventario" },
   { nombre: "Estado P y G", href: "/pyg" },
   { nombre: "Insights", href: "/insights" },
+  { nombre: "Promociones", href: "/promociones" },
 ];
 
 export function Sidebar() {
