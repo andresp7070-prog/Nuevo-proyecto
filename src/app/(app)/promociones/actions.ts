@@ -7,7 +7,7 @@ export async function crearPromocion(input: {
   codigo: string;
   tipoPromocion: "descuento_porcentaje" | "descuento_fijo" | "2x1" | "lleve_x_gratis";
   valor: number | null;
-  aplicaAItemId: string | null;
+  aplicaAItemIds: string[];
   aplicaACategoria: string | null;
   itemRegaloId: string | null;
   fechaInicio: string;
@@ -38,7 +38,6 @@ export async function crearPromocion(input: {
       codigo: input.codigo || null,
       tipo_promocion: input.tipoPromocion,
       valor: input.valor,
-      aplica_a_item_id: input.aplicaAItemId,
       aplica_a_categoria: input.aplicaACategoria,
       item_regalo_id: input.itemRegaloId,
       fecha_inicio: input.fechaInicio,
@@ -49,5 +48,16 @@ export async function crearPromocion(input: {
     .single();
 
   if (error) return { error: error.message };
+
+  if (input.aplicaAItemIds.length > 0) {
+    const { error: errorItems } = await supabase.from("promocion_items").insert(
+      input.aplicaAItemIds.map((itemId) => ({
+        promocion_id: data.id,
+        item_id: itemId,
+      })),
+    );
+    if (errorItems) return { error: errorItems.message };
+  }
+
   return { error: null, id: data.id as string };
 }

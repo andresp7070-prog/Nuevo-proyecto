@@ -552,13 +552,20 @@ create table promociones (
   tipo_promocion text not null
     check (tipo_promocion in ('descuento_porcentaje','descuento_fijo','2x1','lleve_x_gratis')),
   valor numeric(12,2),                                -- 20 (=20%) o 10000 (=$10.000); null para 2x1 y lleve_x_gratis
-  aplica_a_item_id uuid references inventario_items(id),   -- null = aplica a cualquier ítem
   aplica_a_categoria text,                            -- alternativa: toda una categoría
   item_regalo_id uuid references inventario_items(id),  -- solo para 'lleve_x_gratis': qué producto se regala
   fecha_inicio date not null,
   fecha_fin date not null,
   activo boolean not null default true,
   created_at timestamptz default now()
+);
+
+-- Productos específicos a los que aplica una promoción (cuando no aplica a todo el
+-- catálogo ni a una categoría entera) — una promoción puede aplicar a varios productos.
+create table promocion_items (
+  promocion_id uuid references promociones(id) not null,
+  item_id uuid references inventario_items(id) not null,
+  primary key (promocion_id, item_id)
 );
 
 alter table ventas_items add constraint ventas_items_promocion_id_fkey
@@ -615,6 +622,7 @@ alter table inventario_receta enable row level security;
 alter table finanzas_movimientos enable row level security;
 alter table pasivos enable row level security;
 alter table promociones enable row level security;
+alter table promocion_items enable row level security;
 
 -- Funciones auxiliares, para no repetir la misma subconsulta en cada política.
 -- security definer es necesario aquí: la política de "perfiles" usa es_admin(),
@@ -684,6 +692,12 @@ create policy "ver receta de mi inventario" on inventario_receta
 create policy "ver items de mis ventas" on ventas_items
   for all using (
     venta_id in (select id from ventas where empresa_id = mi_empresa_id())
+    or es_admin()
+  );
+
+create policy "ver productos de mis promociones" on promocion_items
+  for all using (
+    promocion_id in (select id from promociones where empresa_id = mi_empresa_id())
     or es_admin()
   );
 

@@ -12,7 +12,7 @@ type Promocion = {
   fecha_fin: string;
   activo: boolean;
   aplica_a_categoria: string | null;
-  producto: { nombre: string } | null;
+  productos: { item: { nombre: string } }[];
   regalo: { nombre: string } | null;
 };
 
@@ -60,7 +60,7 @@ export default async function PromocionDetallePage({
   const { data } = await supabase
     .from("promociones")
     .select(
-      "id, nombre, codigo, tipo_promocion, valor, fecha_inicio, fecha_fin, activo, aplica_a_categoria, producto:inventario_items!promociones_aplica_a_item_id_fkey ( nombre ), regalo:inventario_items!promociones_item_regalo_id_fkey ( nombre )",
+      "id, nombre, codigo, tipo_promocion, valor, fecha_inicio, fecha_fin, activo, aplica_a_categoria, productos:promocion_items ( item:inventario_items ( nombre ) ), regalo:inventario_items!promociones_item_regalo_id_fkey ( nombre )",
     )
     .eq("id", id)
     .single();
@@ -79,11 +79,14 @@ export default async function PromocionDetallePage({
   const efectividad = efectividadData as Efectividad | null;
   const estado = estadoPromocion(promocion);
 
-  const aplicaA = promocion.producto
-    ? `Producto: ${promocion.producto.nombre}`
-    : promocion.aplica_a_categoria
-      ? `Categoría: ${promocion.aplica_a_categoria}`
-      : "Todo el catálogo";
+  const aplicaA =
+    promocion.productos.length > 0
+      ? `Producto${promocion.productos.length > 1 ? "s" : ""}: ${promocion.productos
+          .map((p) => p.item.nombre)
+          .join(", ")}`
+      : promocion.aplica_a_categoria
+        ? `Categoría: ${promocion.aplica_a_categoria}`
+        : "Todo el catálogo";
 
   return (
     <div className="max-w-2xl space-y-6">

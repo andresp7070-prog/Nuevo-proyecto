@@ -50,7 +50,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
 
   const [aplicaA, setAplicaA] = useState<"todo" | "producto" | "categoria">("todo");
   const [busquedaProducto, setBusquedaProducto] = useState("");
-  const [productoSeleccionado, setProductoSeleccionado] = useState<Item | null>(null);
+  const [productosSeleccionados, setProductosSeleccionados] = useState<Item[]>([]);
   const [mostrarSugerenciasProducto, setMostrarSugerenciasProducto] = useState(false);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
   const [mostrarSugerenciasCategoria, setMostrarSugerenciasCategoria] = useState(false);
@@ -66,7 +66,9 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const sugerenciasProducto = filtrarItems(items, busquedaProducto);
+  const sugerenciasProducto = filtrarItems(items, busquedaProducto).filter(
+    (item) => !productosSeleccionados.some((p) => p.id === item.id),
+  );
   const sugerenciasCategoria = filtrarCategorias(categoriasExistentes, categoriaSeleccionada);
   const sugerenciasRegalo = filtrarItems(items, busquedaRegalo);
 
@@ -95,8 +97,8 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
       valor = n;
     }
 
-    if (aplicaA === "producto" && !productoSeleccionado) {
-      setError("Busca y elige el producto al que aplica la promoción.");
+    if (aplicaA === "producto" && productosSeleccionados.length === 0) {
+      setError("Busca y elige al menos un producto al que aplica la promoción.");
       return;
     }
     if (aplicaA === "categoria" && !categoriaSeleccionada.trim()) {
@@ -123,7 +125,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
         codigo: codigo.trim(),
         tipoPromocion,
         valor,
-        aplicaAItemId: aplicaA === "producto" ? productoSeleccionado!.id : null,
+        aplicaAItemIds: aplicaA === "producto" ? productosSeleccionados.map((p) => p.id) : [],
         aplicaACategoria: aplicaA === "categoria" ? categoriaSeleccionada.trim() : null,
         itemRegaloId: tipoPromocion === "lleve_x_gratis" ? regaloSeleccionado!.id : null,
         fechaInicio,
@@ -227,7 +229,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
                     : "border-gray-300 text-gray-700 hover:bg-gray-50"
                 }`}
               >
-                {opcion === "todo" ? "Todo el catálogo" : opcion === "producto" ? "Un producto" : "Una categoría"}
+                {opcion === "todo" ? "Todo el catálogo" : opcion === "producto" ? "Uno o varios productos" : "Una categoría"}
               </button>
             ))}
           </div>
@@ -235,17 +237,16 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
 
         {aplicaA === "producto" && (
           <div className="relative">
-            <label className="mb-1 block text-sm font-medium text-gray-700">Producto *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Productos *</label>
             <input
               value={busquedaProducto}
               onChange={(e) => {
                 setBusquedaProducto(e.target.value);
-                setProductoSeleccionado(null);
                 setMostrarSugerenciasProducto(true);
               }}
               onFocus={() => setMostrarSugerenciasProducto(sugerenciasProducto.length > 0)}
               onBlur={() => setTimeout(() => setMostrarSugerenciasProducto(false), 150)}
-              placeholder="Busca un producto"
+              placeholder="Busca un producto y elige los que quieras"
               className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
             {mostrarSugerenciasProducto && sugerenciasProducto.length > 0 && (
@@ -255,9 +256,8 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
                     <button
                       type="button"
                       onMouseDown={() => {
-                        setProductoSeleccionado(item);
-                        setBusquedaProducto(item.nombre);
-                        setMostrarSugerenciasProducto(false);
+                        setProductosSeleccionados((actuales) => [...actuales, item]);
+                        setBusquedaProducto("");
                       }}
                       className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                     >
@@ -267,8 +267,27 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
                 ))}
               </ul>
             )}
-            {productoSeleccionado && (
-              <p className="mt-1 text-xs text-green-600">Producto seleccionado: {productoSeleccionado.nombre}</p>
+            {productosSeleccionados.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {productosSeleccionados.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center justify-between rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-700"
+                  >
+                    {item.nombre}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProductosSeleccionados((actuales) => actuales.filter((p) => p.id !== item.id))
+                      }
+                      className="text-gray-400 hover:text-gray-700"
+                      aria-label={`Quitar ${item.nombre}`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         )}
