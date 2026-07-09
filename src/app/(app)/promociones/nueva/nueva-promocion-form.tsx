@@ -376,6 +376,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
               type="date"
               value={fechaInicio}
               onChange={(e) => setFechaInicio(e.target.value)}
+              onClick={(e) => e.currentTarget.showPicker?.()}
               className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
@@ -385,6 +386,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
               type="date"
               value={fechaFin}
               onChange={(e) => setFechaFin(e.target.value)}
+              onClick={(e) => e.currentTarget.showPicker?.()}
               className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
           </div>

@@ -267,17 +267,32 @@ export function NuevaVentaForm({
         clienteEmail: email.trim(),
         fecha: fechaHora,
         metodoPago,
-        items: lineasValidas.map((linea) => ({
-          itemId: linea.itemId,
-          cantidad: linea.cantidad,
-          precioUnitario: linea.precioUnitario,
-          promocionId: linea.promocionId,
-          descuentoAplicado: linea.esGratis
-            ? linea.precioOriginal * linea.cantidad
-            : linea.promocionId
+        items: lineasValidas.map((linea) => {
+          if (linea.esGratis) {
+            return {
+              itemId: linea.itemId,
+              cantidad: linea.cantidad,
+              precioUnitario: linea.precioUnitario,
+              promocionId: linea.promocionId,
+              descuentoAplicado: linea.precioOriginal * linea.cantidad,
+            };
+          }
+          // Para 2x1 y "lleve X gratis", esta línea se paga a precio normal — la promoción
+          // ya queda registrada por la línea gratis. Marcarla aquí también inflaría el
+          // conteo de "unidades con descuento" en el desempeño de la promoción.
+          const promo = promociones.find((p) => p.id === linea.promocionId) ?? null;
+          const esDescuentoDirecto =
+            promo?.tipoPromocion === "descuento_porcentaje" || promo?.tipoPromocion === "descuento_fijo";
+          return {
+            itemId: linea.itemId,
+            cantidad: linea.cantidad,
+            precioUnitario: linea.precioUnitario,
+            promocionId: esDescuentoDirecto ? linea.promocionId : null,
+            descuentoAplicado: esDescuentoDirecto
               ? Math.max(0, linea.precioOriginal - linea.precioUnitario) * linea.cantidad
               : 0,
-        })),
+          };
+        }),
       });
       if (resultado.error) {
         setError(resultado.error);
