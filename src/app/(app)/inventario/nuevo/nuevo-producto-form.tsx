@@ -262,10 +262,10 @@ export function NuevoProductoForm({
         onChange={(e) => actualizarNombre(e.target.value)}
         onFocus={() => setMostrarSugerenciasNombre(sugerenciasNombre.length > 0)}
         onBlur={() => setTimeout(() => setMostrarSugerenciasNombre(false), 150)}
-        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
       />
       {mostrarSugerenciasNombre && sugerenciasNombre.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+        <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
           {sugerenciasNombre.map((valor) => (
             <li key={valor}>
               <button
@@ -302,10 +302,10 @@ export function NuevoProductoForm({
         }
         onBlur={() => setTimeout(() => setMostrarSugerenciasCategoria(false), 150)}
         placeholder="Ej. Jabones, Detergentes"
-        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
       />
       {mostrarSugerenciasCategoria && filtrar(categoriasExistentes, categoria).length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+        <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
           {filtrar(categoriasExistentes, categoria).map((valor) => (
             <li key={valor}>
               <button
@@ -345,7 +345,7 @@ export function NuevoProductoForm({
           setErrorFoto(null);
           setFotoFile(file);
         }}
-        className="w-full rounded border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1 file:text-sm"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-1 file:text-sm"
       />
       {errorFoto && <p className="mt-1 text-xs text-red-600">{errorFoto}</p>}
     </div>
@@ -360,13 +360,13 @@ export function NuevoProductoForm({
         <input
           value={UNIDADES.find((u) => u.valor === itemExistente.unidad)?.etiqueta ?? itemExistente.unidad}
           disabled
-          className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
         />
       ) : (
         <select
           value={unidad}
           onChange={(e) => setUnidad(e.target.value)}
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
         >
           {UNIDADES.map((u) => (
             <option key={u.valor} value={u.valor}>
@@ -395,7 +395,7 @@ export function NuevoProductoForm({
           value={contenidoPorUnidad}
           onChange={(e) => setContenidoPorUnidad(e.target.value)}
           placeholder="Ej. 500"
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
         />
         <p className="mt-1 text-xs text-gray-400">
           ¿Cuánto trae cada unidad? Ej. si cada una son 500{" "}
@@ -406,7 +406,7 @@ export function NuevoProductoForm({
     ) : null;
 
   const campoCantidad = volverAReceta ? (
-    <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
       Este producto no tiene una cantidad fija en stock — cuánto hay disponible se calcula
       solo, según los insumos que le queden. Al venderlo, se descuentan automáticamente.
     </div>
@@ -425,7 +425,7 @@ export function NuevoProductoForm({
         min={0}
         value={cantidad}
         onChange={(e) => setCantidad(e.target.value)}
-        className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
       />
     </div>
   );
@@ -435,7 +435,7 @@ export function NuevoProductoForm({
       <label className="mb-1 block text-sm font-medium text-gray-700">
         Costo por unidad (calculado según la receta)
       </label>
-      <div className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+      <div className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
         {costoCalculado.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
       </div>
       <p className="mt-1 text-xs text-gray-400">
@@ -471,7 +471,7 @@ export function NuevoProductoForm({
   );
 
   const panelReceta = (
-    <div className="rounded-lg border border-gray-200 p-4">
+    <div className="rounded-xl border border-gray-200 p-4">
       <h2 className="mb-1 text-sm font-semibold text-gray-900">
         ¿De qué insumos se compone?
       </h2>
@@ -496,7 +496,7 @@ export function NuevoProductoForm({
       </div>
 
       {volverAReceta && (
-        <p className="mb-4 rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">
+        <p className="mb-4 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
           Primero elige de qué insumos se compone este producto — así calculamos su costo y
           puedes poner un precio de venta con eso en mente. Al final le pones nombre y, si
           hace falta, unidad.
@@ -504,13 +504,13 @@ export function NuevoProductoForm({
       )}
 
       {mensajeExito && (
-        <p className="mb-4 rounded bg-green-50 px-3 py-2 text-sm text-green-700">
+        <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
           {mensajeExito} Puedes seguir agregando otro producto.
         </p>
       )}
 
       {error && (
-        <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
           {error}
         </p>
       )}
@@ -547,7 +547,7 @@ export function NuevoProductoForm({
         type="button"
         onClick={guardar}
         disabled={guardando}
-        className="mt-6 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="mt-6 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {guardando ? "Guardando..." : "Guardar producto"}
       </button>

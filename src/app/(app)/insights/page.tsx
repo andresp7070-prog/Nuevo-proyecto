@@ -302,7 +302,7 @@ export default async function InsightsPage() {
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Resumen general</h2>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-gray-200 p-4">
+          <div className="rounded-xl border border-gray-200 p-4">
             <h3 className="mb-3 text-xs font-medium text-gray-700">Ventas por día de la semana</h3>
             {promedioGeneral > 0 ? (
               <GraficoBarras datos={barrasDiaSemana} />
@@ -311,7 +311,7 @@ export default async function InsightsPage() {
             )}
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-4">
+          <div className="rounded-xl border border-gray-200 p-4">
             <h3 className="mb-3 text-xs font-medium text-gray-700">Festivos vs. días normales</h3>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -330,7 +330,7 @@ export default async function InsightsPage() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-lg border border-gray-200 p-4">
+        <div className="mt-4 rounded-xl border border-gray-200 p-4">
           <h3 className="mb-3 text-xs font-medium text-gray-700">Ventas por hora del día</h3>
           {ventasConHora.length === 0 ? (
             <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
@@ -339,7 +339,7 @@ export default async function InsightsPage() {
           )}
         </div>
 
-        <div className="mt-4 rounded-lg border border-gray-200 p-4">
+        <div className="mt-4 rounded-xl border border-gray-200 p-4">
           <h3 className="mb-3 text-xs font-medium text-gray-700">Margen por producto</h3>
           {barrasMargen.length === 0 ? (
             <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
@@ -348,7 +348,7 @@ export default async function InsightsPage() {
           )}
         </div>
 
-        <div className="mt-4 rounded-lg border border-gray-200 p-4">
+        <div className="mt-4 rounded-xl border border-gray-200 p-4">
           <h3 className="mb-3 text-xs font-medium text-gray-700">Utilidad por mes</h3>
           {barrasMes.length === 0 ? (
             <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
@@ -358,7 +358,7 @@ export default async function InsightsPage() {
         </div>
 
         {porProducto.length > 0 && (
-          <div className="mt-4 rounded-lg border border-gray-200 p-4">
+          <div className="mt-4 rounded-xl border border-gray-200 p-4">
             <h3 className="mb-3 text-xs font-medium text-gray-700">Detalle por producto</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -404,7 +404,7 @@ export default async function InsightsPage() {
         ) : (
           <ul className="space-y-2">
             {insights.map((insight, i) => (
-              <li key={i} className="rounded-lg border border-gray-200 p-3">
+              <li key={i} className="rounded-xl border border-gray-200 p-3">
                 <p className="text-sm font-medium text-gray-900">{insight.titulo}</p>
                 <p className="text-xs text-gray-500">{insight.detalle}</p>
               </li>

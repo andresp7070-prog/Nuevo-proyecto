@@ -59,7 +59,7 @@ export default async function FichaProductoPage({
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             <FotoProducto itemId={item.id} fotoUrl={fotoUrl} />
@@ -78,7 +78,7 @@ export default async function FichaProductoPage({
           <div className="flex gap-2">
             <Link
               href={`/inventario/${item.id}/receta`}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
             >
               Configurar receta
             </Link>
@@ -116,7 +116,7 @@ export default async function FichaProductoPage({
         )}
       </div>
 
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">Receta</h2>
         {receta.length === 0 ? (
           <p className="text-sm text-gray-400">

@@ -96,7 +96,7 @@ export default async function VentasPage({
           />
           <Link
             href="/ventas/nueva"
-            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
             Agregar venta
           </Link>
@@ -104,17 +104,17 @@ export default async function VentasPage({
       </div>
 
       {guardada === "1" && (
-        <p className="mb-4 rounded bg-green-50 px-3 py-2 text-sm text-green-700">
+        <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
           Venta registrada correctamente.
         </p>
       )}
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:w-80">
-        <div className="rounded-lg border border-gray-200 p-4">
+        <div className="rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-400">Total de ventas</p>
           <p className="text-lg font-semibold text-gray-900">{totalVentas}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 p-4">
+        <div className="rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-400">Total vendido</p>
           <p className="text-lg font-semibold text-gray-900">
             {totalVendido.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
@@ -125,7 +125,7 @@ export default async function VentasPage({
       {ventas.length === 0 ? (
         <p className="text-gray-400">Todavía no hay ventas registradas.</p>
       ) : (
-        <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+        <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200">
           {ventas.map((venta) => {
             const productos = venta.ventas_items
               .map((item) => `${item.inventario_items?.nombre ?? "Producto eliminado"} ×${item.cantidad}`)

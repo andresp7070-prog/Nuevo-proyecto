@@ -204,9 +204,9 @@ export function GraficoBarrasHorizontal({ datos }: { datos: Barra[] }) {
             <span className="w-36 shrink-0 truncate text-gray-600" title={d.etiqueta}>
               {d.etiqueta}
             </span>
-            <div className="h-4 flex-1 rounded bg-gray-100">
+            <div className="h-4 flex-1 rounded-lg bg-gray-100">
               <div
-                className="h-4 rounded transition-opacity"
+                className="h-4 rounded-lg transition-opacity"
                 style={{
                   width: `${Math.max(ancho, 2)}%`,
                   backgroundColor: color,

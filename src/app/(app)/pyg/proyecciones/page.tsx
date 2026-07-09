@@ -93,7 +93,7 @@ export default async function ProyeccionesPygPage() {
         </p>
       ) : (
         <>
-          <div className="max-w-sm rounded-lg border border-gray-200 p-4">
+          <div className="max-w-sm rounded-xl border border-gray-200 p-4">
             <h2 className="mb-4 text-sm font-semibold text-gray-900">
               Proyección para {mesSiguiente(meses[0].mes)}
             </h2>
@@ -129,7 +129,7 @@ export default async function ProyeccionesPygPage() {
             </dl>
           </div>
 
-          <div className="max-w-sm rounded-lg border border-gray-200 p-4">
+          <div className="max-w-sm rounded-xl border border-gray-200 p-4">
             <p className="mb-2 text-xs font-medium text-gray-700">Basado en:</p>
             <ul className="divide-y divide-gray-100 text-sm">
               {meses.map((f) => (

@@ -153,11 +153,11 @@ export function RecetaLineas({
                     )
                   }
                   placeholder="Busca un producto del inventario"
-                  className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                 />
                 {linea.mostrarSugerencias &&
                   filtrarInsumos(insumosDisponibles, linea.busqueda).length > 0 && (
-                    <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+                    <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
                       {filtrarInsumos(insumosDisponibles, linea.busqueda).map((insumo) => (
                         <li key={insumo.id}>
                           <button
@@ -180,7 +180,7 @@ export function RecetaLineas({
                   min={0}
                   value={linea.cantidad}
                   onChange={(e) => actualizarLinea(linea.key, { cantidad: e.target.value })}
-                  className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                 />
               </div>
               <div className="col-span-3">
@@ -189,7 +189,7 @@ export function RecetaLineas({
                   <select
                     value={linea.unidadEntrada}
                     onChange={(e) => actualizarLinea(linea.key, { unidadEntrada: e.target.value })}
-                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                   >
                     {unidadesCompatibles.map((u) => (
                       <option key={u.valor} value={u.valor}>
@@ -206,7 +206,7 @@ export function RecetaLineas({
                         : ""
                     }
                     disabled
-                    className="w-full rounded border border-gray-200 bg-gray-50 px-2 py-2 text-sm text-gray-500"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-2 text-sm text-gray-500"
                   />
                 )}
               </div>

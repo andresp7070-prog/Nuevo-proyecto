@@ -69,7 +69,7 @@ export function DirectorioClientes({ contactos }: { contactos: Contacto[] }) {
           />
           <Link
             href="/crm/nuevo"
-            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
             Agregar cliente
           </Link>
@@ -81,12 +81,12 @@ export function DirectorioClientes({ contactos }: { contactos: Contacto[] }) {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar por nombre o empresa"
-          className="w-full max-w-xs rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
         />
         <select
           value={etapaFiltro}
           onChange={(e) => setEtapaFiltro(e.target.value)}
-          className="rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
         >
           {etapas.map((etapa) => (
             <option key={etapa.value} value={etapa.value}>
@@ -99,7 +99,7 @@ export function DirectorioClientes({ contactos }: { contactos: Contacto[] }) {
       {filtrados.length === 0 ? (
         <p className="text-gray-400">No hay clientes que coincidan.</p>
       ) : (
-        <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+        <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200">
           {filtrados.map((contacto) => (
             <li key={contacto.id}>
               <Link

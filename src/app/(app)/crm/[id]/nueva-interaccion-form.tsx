@@ -50,12 +50,12 @@ export function NuevaInteraccionForm({ contactoId }: { contactoId: string }) {
           type="date"
           value={fecha}
           onChange={(e) => setFecha(e.target.value)}
-          className="rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
         />
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
-          className="rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
         >
           {tipos.map((item) => (
             <option key={item.value} value={item.value}>
@@ -67,7 +67,7 @@ export function NuevaInteraccionForm({ contactoId }: { contactoId: string }) {
           value={nota}
           onChange={(e) => setNota(e.target.value)}
           placeholder="Nota *"
-          className="rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none sm:col-span-2"
+          className="rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none sm:col-span-2"
         />
       </div>
 
@@ -79,7 +79,7 @@ export function NuevaInteraccionForm({ contactoId }: { contactoId: string }) {
         type="button"
         onClick={guardar}
         disabled={guardando}
-        className="mt-3 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="mt-3 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {guardando ? "Guardando..." : "Agregar interacción"}
       </button>

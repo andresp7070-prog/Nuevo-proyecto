@@ -52,10 +52,10 @@ export function DirectorioRecetas({ items }: { items: Item[] }) {
           onFocus={() => setMostrarSugerencias(sugerencias.length > 0)}
           onBlur={() => setTimeout(() => setMostrarSugerencias(false), 150)}
           placeholder="Ej. Hamburguesa"
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
         />
         {mostrarSugerencias && busqueda.trim() && (
-          <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+          <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
             {sugerencias.map((item) => (
               <li key={item.id}>
                 <Link
@@ -88,7 +88,7 @@ export function DirectorioRecetas({ items }: { items: Item[] }) {
           combinando otros (ej. &ldquo;Hamburguesa&rdquo;) para empezar.
         </p>
       ) : (
-        <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+        <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200">
           {configuradas.map((item) => (
             <li key={item.id}>
               <Link

@@ -9,11 +9,11 @@ export default async function LoginPage({
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
         <h1 className="mb-6 text-xl font-semibold text-gray-900">Iniciar sesión</h1>
 
         {error && (
-          <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         )}
@@ -28,7 +28,7 @@ export default async function LoginPage({
               name="email"
               type="email"
               required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
 
@@ -41,13 +41,13 @@ export default async function LoginPage({
               name="password"
               type="password"
               required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="w-full rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
             Entrar
           </button>

@@ -37,10 +37,10 @@ export function FotoProducto({ itemId, fotoUrl }: { itemId: string; fotoUrl: str
         <img
           src={fotoUrl}
           alt="Foto del producto"
-          className="h-24 w-24 rounded-lg border border-gray-200 object-cover"
+          className="h-24 w-24 rounded-xl border border-gray-200 object-cover"
         />
       ) : (
-        <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-gray-300 text-xs text-gray-400">
+        <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-dashed border-gray-300 text-xs text-gray-400">
           {subiendo ? "Subiendo..." : "Sin foto"}
         </div>
       )}
@@ -60,7 +60,7 @@ export function FotoProducto({ itemId, fotoUrl }: { itemId: string; fotoUrl: str
           subir(file);
         }}
         disabled={subiendo}
-        className="w-24 text-xs file:mr-1 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs"
+        className="w-24 text-xs file:mr-1 file:rounded-lg file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs"
       />
       {error && <p className="max-w-32 text-center text-xs text-red-600">{error}</p>}
     </div>

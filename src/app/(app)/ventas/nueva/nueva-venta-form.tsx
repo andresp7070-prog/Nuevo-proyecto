@@ -307,7 +307,7 @@ export function NuevaVentaForm({
   }
 
   const seccionCliente = (
-    <section key="cliente" className="rounded-lg border border-gray-200 p-4">
+    <section key="cliente" className="rounded-xl border border-gray-200 p-4">
       <h2 className="mb-4 text-sm font-semibold text-gray-900">Cliente</h2>
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="relative sm:col-span-1">
@@ -317,11 +317,11 @@ export function NuevaVentaForm({
             onChange={(e) => actualizarNombre(e.target.value)}
             onFocus={() => setMostrarSugerencias(sugerencias.length > 0)}
             onBlur={() => setTimeout(() => setMostrarSugerencias(false), 150)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             placeholder="Nombre del cliente"
           />
           {mostrarSugerencias && sugerencias.length > 0 && (
-            <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+            <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
               {sugerencias.map((cliente) => (
                 <li key={cliente.id}>
                   <button
@@ -356,7 +356,7 @@ export function NuevaVentaForm({
             type="tel"
             inputMode="numeric"
             required
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -367,7 +367,7 @@ export function NuevaVentaForm({
             onChange={(e) => setEmail(e.target.value)}
             type="email"
             required
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
       </div>
@@ -375,7 +375,7 @@ export function NuevaVentaForm({
   );
 
   const seccionProductos = (
-    <section key="productos" className="rounded-lg border border-gray-200 p-4">
+    <section key="productos" className="rounded-xl border border-gray-200 p-4">
       <h2 className="mb-4 text-sm font-semibold text-gray-900">Productos</h2>
       <div className="space-y-3">
         {lineas.map((linea) => {
@@ -383,7 +383,7 @@ export function NuevaVentaForm({
             return (
               <div
                 key={linea.key}
-                className="grid grid-cols-12 items-end gap-2 rounded bg-green-50 px-2 py-2"
+                className="grid grid-cols-12 items-end gap-2 rounded-lg bg-green-50 px-2 py-2"
               >
                 <div className="col-span-6">
                   <p className="text-xs font-medium text-gray-700">Producto</p>
@@ -399,12 +399,12 @@ export function NuevaVentaForm({
                     onChange={(e) =>
                       actualizarLinea(linea.key, { cantidad: Number(e.target.value) || 0 })
                     }
-                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                   />
                 </div>
                 <div className="col-span-3">
                   <p className="text-xs font-medium text-gray-700">Precio unitario</p>
-                  <p className="rounded border border-gray-200 bg-white px-2 py-2 text-sm text-gray-500">
+                  <p className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-500">
                     $0
                   </p>
                 </div>
@@ -443,11 +443,11 @@ export function NuevaVentaForm({
                       )
                     }
                     placeholder="Busca por nombre o marca"
-                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                   />
                   {linea.mostrarSugerenciasProducto &&
                     filtrarItems(items, linea.busquedaProducto).length > 0 && (
-                      <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+                      <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
                         {filtrarItems(items, linea.busquedaProducto).map((item) => (
                           <li key={item.id}>
                             <button
@@ -474,7 +474,7 @@ export function NuevaVentaForm({
                     onChange={(e) =>
                       actualizarLinea(linea.key, { cantidad: Number(e.target.value) || 0 })
                     }
-                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                   />
                 </div>
                 <div className="col-span-3">
@@ -488,7 +488,7 @@ export function NuevaVentaForm({
                     onChange={(e) =>
                       actualizarLinea(linea.key, { precioUnitario: Number(e.target.value) || 0 })
                     }
-                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                   />
                 </div>
                 <div className="col-span-1 flex justify-end">
@@ -511,7 +511,7 @@ export function NuevaVentaForm({
                       const promo = aplicables.find((p) => p.id === e.target.value) ?? null;
                       aplicarPromocion(linea, promo);
                     }}
-                    className="rounded border border-gray-300 px-2 py-1 text-xs focus:border-gray-500 focus:outline-none"
+                    className="rounded-lg border border-gray-300 px-2 py-1 text-xs focus:border-gray-500 focus:outline-none"
                   >
                     <option value="">Sin promoción</option>
                     {aplicables.map((promo) => (
@@ -525,7 +525,7 @@ export function NuevaVentaForm({
                     <button
                       type="button"
                       onClick={() => agregarUnidadGratis(linea, promoSeleccionada)}
-                      className="rounded border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50"
+                      className="rounded-lg border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50"
                     >
                       + Unidad gratis (2x1)
                     </button>
@@ -534,7 +534,7 @@ export function NuevaVentaForm({
                     <button
                       type="button"
                       onClick={() => agregarRegalo(promoSeleccionada)}
-                      className="rounded border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50"
+                      className="rounded-lg border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50"
                     >
                       + Regalo: {promoSeleccionada.regaloNombre}
                     </button>
@@ -572,7 +572,7 @@ export function NuevaVentaForm({
           <select
             value={metodoPago}
             onChange={(e) => setMetodoPago(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
           >
             {metodosPago.length === 0 && <option value="">Sin métodos configurados</option>}
             {metodosPago.map((valor) => (
@@ -618,7 +618,7 @@ export function NuevaVentaForm({
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
         <div>
@@ -627,7 +627,7 @@ export function NuevaVentaForm({
             type="time"
             value={hora}
             onChange={(e) => setHora(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
       </div>
@@ -642,7 +642,7 @@ export function NuevaVentaForm({
         type="button"
         onClick={guardar}
         disabled={guardando}
-        className="mt-6 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="mt-6 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {guardando ? "Guardando..." : "Guardar venta"}
       </button>

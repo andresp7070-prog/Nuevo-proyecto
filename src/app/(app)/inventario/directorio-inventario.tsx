@@ -76,7 +76,7 @@ export function DirectorioInventario({
           />
           <Link
             href="/inventario/nuevo"
-            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
             Agregar producto
           </Link>
@@ -84,7 +84,7 @@ export function DirectorioInventario({
       </div>
 
       {creado && (
-        <p className="mb-4 rounded bg-green-50 px-3 py-2 text-sm text-green-700">
+        <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
           Producto creado correctamente.
         </p>
       )}
@@ -93,13 +93,13 @@ export function DirectorioInventario({
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
         placeholder="Buscar por nombre, categoría o marca"
-        className="mb-4 w-full max-w-xs rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+        className="mb-4 w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
       />
 
       {filtrados.length === 0 ? (
         <p className="text-gray-400">No hay productos que coincidan.</p>
       ) : (
-        <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+        <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200">
           {filtrados.map((item) => (
             <li key={item.id}>
               <Link
@@ -112,10 +112,10 @@ export function DirectorioInventario({
                     <img
                       src={item.fotoUrl}
                       alt=""
-                      className="h-10 w-10 shrink-0 rounded border border-gray-200 object-cover"
+                      className="h-10 w-10 shrink-0 rounded-lg border border-gray-200 object-cover"
                     />
                   ) : (
-                    <div className="h-10 w-10 shrink-0 rounded border border-dashed border-gray-200" />
+                    <div className="h-10 w-10 shrink-0 rounded-lg border border-dashed border-gray-200" />
                   )}
                   <div>
                     <p className="text-sm font-medium text-gray-900">{item.nombre}</p>

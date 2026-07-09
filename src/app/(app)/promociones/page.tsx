@@ -85,7 +85,7 @@ export default async function PromocionesPage() {
           />
           <Link
             href="/promociones/nueva"
-            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
             Agregar promoción
           </Link>
@@ -95,7 +95,7 @@ export default async function PromocionesPage() {
       {promociones.length === 0 ? (
         <p className="text-gray-400">Todavía no tienes promociones registradas.</p>
       ) : (
-        <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200">
+        <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200">
           {promociones.map((p) => {
             const estado = estadoPromocion(p);
             return (

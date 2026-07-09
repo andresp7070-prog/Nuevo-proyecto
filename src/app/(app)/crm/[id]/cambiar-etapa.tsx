@@ -35,7 +35,7 @@ export function CambiarEtapa({
       value={etapa}
       onChange={(e) => onChange(e.target.value)}
       disabled={guardando}
-      className="rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none disabled:opacity-50"
+      className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none disabled:opacity-50"
     >
       {etapas.map((item) => (
         <option key={item.value} value={item.value}>

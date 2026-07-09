@@ -118,7 +118,7 @@ export default async function ProyeccionesInventarioPage() {
           Todavía no hay suficientes ventas recientes para proyectar el inventario.
         </p>
       ) : (
-        <div className="mb-6 overflow-x-auto rounded-lg border border-gray-200">
+        <div className="mb-6 overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-gray-200 text-xs text-gray-400">
               <tr>

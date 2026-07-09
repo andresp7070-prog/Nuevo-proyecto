@@ -39,7 +39,7 @@ export function CampoMoneda({
           onFocus={() => setEnfocado(true)}
           onBlur={() => setEnfocado(false)}
           inputMode="numeric"
-          className="w-full rounded border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-gray-500 focus:outline-none"
+          className="w-full rounded-lg border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-gray-500 focus:outline-none"
         />
       </div>
     </div>

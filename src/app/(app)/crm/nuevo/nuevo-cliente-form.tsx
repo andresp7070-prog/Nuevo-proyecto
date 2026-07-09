@@ -61,7 +61,7 @@ export function NuevoClienteForm() {
           <input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -72,7 +72,7 @@ export function NuevoClienteForm() {
             onChange={(e) => setTelefono(e.target.value.replace(/\D/g, ""))}
             type="tel"
             inputMode="numeric"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -82,7 +82,7 @@ export function NuevoClienteForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -93,7 +93,7 @@ export function NuevoClienteForm() {
           <input
             value={empresaCliente}
             onChange={(e) => setEmpresaCliente(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
       </div>
@@ -106,7 +106,7 @@ export function NuevoClienteForm() {
         type="button"
         onClick={guardar}
         disabled={guardando}
-        className="mt-6 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="mt-6 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {guardando ? "Guardando..." : "Guardar cliente"}
       </button>

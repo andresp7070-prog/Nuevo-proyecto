@@ -76,12 +76,12 @@ export default async function ProyeccionesVentasPage() {
         </p>
       ) : (
         <>
-          <div className="mb-6 max-w-sm rounded-lg border border-gray-200 p-4">
+          <div className="mb-6 max-w-sm rounded-xl border border-gray-200 p-4">
             <p className="text-xs text-gray-400">Ventas proyectadas para {mesSiguiente(meses[0].mes)}</p>
             <p className="text-2xl font-semibold text-gray-900">{formatoMoneda(promedio)}</p>
           </div>
 
-          <div className="max-w-sm rounded-lg border border-gray-200 p-4">
+          <div className="max-w-sm rounded-xl border border-gray-200 p-4">
             <p className="mb-2 text-xs font-medium text-gray-700">Basado en:</p>
             <ul className="divide-y divide-gray-100 text-sm">
               {meses.map((f) => (

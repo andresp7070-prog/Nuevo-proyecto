@@ -73,7 +73,7 @@ export function NuevoPasivoForm() {
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             placeholder="Ej. Préstamo Bancolombia"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -82,7 +82,7 @@ export function NuevoPasivoForm() {
           <select
             value={tipo}
             onChange={(e) => setTipo(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           >
             {tipos.map((t) => (
               <option key={t.value} value={t.value}>
@@ -108,7 +108,7 @@ export function NuevoPasivoForm() {
             type="date"
             value={fechaVencimiento}
             onChange={(e) => setFechaVencimiento(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -121,7 +121,7 @@ export function NuevoPasivoForm() {
         type="button"
         onClick={guardar}
         disabled={guardando}
-        className="mt-6 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="mt-6 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {guardando ? "Guardando..." : "Guardar"}
       </button>

@@ -163,13 +163,13 @@ export default async function PygPage({
         <div className="flex gap-2">
           <Link
             href="/pyg/movimientos/nuevo"
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
           >
             Agregar gasto o ingreso
           </Link>
           <Link
             href="/pyg/pasivos"
-            className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
           >
             Deudas
           </Link>
@@ -181,7 +181,7 @@ export default async function PygPage({
           <Link
             key={f.mes}
             href={`/pyg?mes=${f.mes.slice(0, 10)}`}
-            className={`rounded px-3 py-1.5 text-sm ${
+            className={`rounded-lg px-3 py-1.5 text-sm ${
               f.mes.slice(0, 7) === mesSeleccionado.slice(0, 7)
                 ? "bg-gray-900 text-white"
                 : "border border-gray-300 text-gray-700 hover:bg-gray-100"
@@ -193,7 +193,7 @@ export default async function PygPage({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-gray-200 p-4">
+        <div className="rounded-xl border border-gray-200 p-4">
           <h2 className="mb-4 text-sm font-semibold text-gray-900">Utilidad</h2>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -225,7 +225,7 @@ export default async function PygPage({
           </dl>
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-4">
+        <div className="rounded-xl border border-gray-200 p-4">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-900">Deudas pendientes</h2>
             <Link href="/pyg/pasivos" className="text-xs text-gray-500 hover:text-gray-700">
@@ -256,7 +256,7 @@ export default async function PygPage({
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-900">Utilidad por categoría</h2>
           <DescargarCsv
@@ -304,7 +304,7 @@ export default async function PygPage({
         )}
       </div>
 
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-900">Utilidad por producto</h2>
           <DescargarCsv

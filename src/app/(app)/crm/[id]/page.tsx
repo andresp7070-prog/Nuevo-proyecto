@@ -59,12 +59,12 @@ export default async function FichaClientePage({
   return (
     <div className="max-w-3xl space-y-6">
       {creado === "1" && (
-        <p className="rounded bg-green-50 px-3 py-2 text-sm text-green-700">
+        <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
           Cliente creado correctamente.
         </p>
       )}
 
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">{contacto.nombre}</h1>
@@ -80,7 +80,7 @@ export default async function FichaClientePage({
       </div>
 
       {perfilCompra && (
-        <div className="rounded-lg border border-gray-200 p-4">
+        <div className="rounded-xl border border-gray-200 p-4">
           <h2 className="mb-4 text-sm font-semibold text-gray-900">Perfil de compra</h2>
           <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
             <div>
@@ -129,7 +129,7 @@ export default async function FichaClientePage({
         </div>
       )}
 
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">Historial de compras</h2>
         {compras && compras.length > 0 ? (
           <ul className="divide-y divide-gray-200">
@@ -158,7 +158,7 @@ export default async function FichaClientePage({
         )}
       </div>
 
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">Interacciones</h2>
         {interacciones && interacciones.length > 0 ? (
           <ul className="mb-4 divide-y divide-gray-200">

@@ -94,7 +94,7 @@ export default async function PromocionDetallePage({
         ← Volver a promociones
       </Link>
 
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">{promocion.nombre}</h1>
@@ -137,7 +137,7 @@ export default async function PromocionDetallePage({
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 p-4">
+      <div className="rounded-xl border border-gray-200 p-4">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">Desempeño</h2>
         {!efectividad || efectividad.ventas_con_este_descuento === 0 ? (
           <p className="text-sm text-gray-400">

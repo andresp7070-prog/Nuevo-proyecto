@@ -160,7 +160,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             placeholder="Ej. Cambio de aceite 20% - Julio"
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -169,7 +169,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
           <input
             value={codigo}
             onChange={(e) => setCodigo(e.target.value)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
 
@@ -178,7 +178,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
           <select
             value={tipoPromocion}
             onChange={(e) => setTipoPromocion(e.target.value as typeof tipoPromocion)}
-            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           >
             {TIPOS.map((t) => (
               <option key={t.value} value={t.value}>
@@ -200,7 +200,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
               value={valorPorcentaje}
               onChange={(e) => setValorPorcentaje(e.target.value)}
               placeholder="Ej. 20"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
         )}
@@ -223,7 +223,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
                 key={opcion}
                 type="button"
                 onClick={() => setAplicaA(opcion)}
-                className={`flex-1 rounded border px-3 py-2 text-xs ${
+                className={`flex-1 rounded-lg border px-3 py-2 text-xs ${
                   aplicaA === opcion
                     ? "border-gray-900 bg-gray-900 text-white"
                     : "border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -247,10 +247,10 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
               onFocus={() => setMostrarSugerenciasProducto(sugerenciasProducto.length > 0)}
               onBlur={() => setTimeout(() => setMostrarSugerenciasProducto(false), 150)}
               placeholder="Busca un producto y elige los que quieras"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
             {mostrarSugerenciasProducto && sugerenciasProducto.length > 0 && (
-              <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+              <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
                 {sugerenciasProducto.map((item) => (
                   <li key={item.id}>
                     <button
@@ -272,7 +272,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
                 {productosSeleccionados.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-center justify-between rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-700"
+                    className="flex items-center justify-between rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700"
                   >
                     {item.nombre}
                     <button
@@ -304,10 +304,10 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
               onFocus={() => setMostrarSugerenciasCategoria(sugerenciasCategoria.length > 0)}
               onBlur={() => setTimeout(() => setMostrarSugerenciasCategoria(false), 150)}
               placeholder="Ej. Jabones"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
             {mostrarSugerenciasCategoria && sugerenciasCategoria.length > 0 && (
-              <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+              <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
                 {sugerenciasCategoria.map((c) => (
                   <li key={c}>
                     <button
@@ -342,10 +342,10 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
               onFocus={() => setMostrarSugerenciasRegalo(sugerenciasRegalo.length > 0)}
               onBlur={() => setTimeout(() => setMostrarSugerenciasRegalo(false), 150)}
               placeholder="Busca un producto"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
             {mostrarSugerenciasRegalo && sugerenciasRegalo.length > 0 && (
-              <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+              <ul className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-sm">
                 {sugerenciasRegalo.map((item) => (
                   <li key={item.id}>
                     <button
@@ -377,7 +377,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
               value={fechaInicio}
               onChange={(e) => setFechaInicio(e.target.value)}
               onClick={(e) => e.currentTarget.showPicker?.()}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
           <div>
@@ -387,7 +387,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
               value={fechaFin}
               onChange={(e) => setFechaFin(e.target.value)}
               onClick={(e) => e.currentTarget.showPicker?.()}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
             />
           </div>
         </div>
@@ -406,7 +406,7 @@ export function NuevaPromocionForm({ items }: { items: Item[] }) {
         type="button"
         onClick={guardar}
         disabled={guardando}
-        className="mt-6 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="mt-6 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
       >
         {guardando ? "Guardando..." : "Guardar promoción"}
       </button>

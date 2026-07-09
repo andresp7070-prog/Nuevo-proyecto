@@ -108,19 +108,19 @@ function FilaPasivo({ pasivo, pagos }: { pasivo: Pasivo; pagos: Pago[] }) {
             onChange={(e) => setAbono(e.target.value.replace(/\D/g, ""))}
             placeholder="Abono"
             inputMode="numeric"
-            className="w-24 rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
+            className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
           />
           <input
             type="date"
             value={fechaAbono}
             onChange={(e) => setFechaAbono(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
+            className="rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
           />
           <button
             type="button"
             onClick={guardarAbono}
             disabled={procesando}
-            className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            className="rounded-lg border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           >
             Registrar abono
           </button>
@@ -129,13 +129,13 @@ function FilaPasivo({ pasivo, pagos }: { pasivo: Pasivo; pagos: Pago[] }) {
             type="date"
             value={fechaPago}
             onChange={(e) => setFechaPago(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
+            className="rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
           />
           <button
             type="button"
             onClick={pagarTodo}
             disabled={procesando}
-            className="rounded border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            className="rounded-lg border border-gray-300 px-3 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           >
             Marcar como pagado
           </button>
@@ -190,7 +190,7 @@ export function DirectorioPasivos({
         </div>
         <Link
           href="/pyg/pasivos/nuevo"
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
         >
           Agregar deuda
         </Link>
@@ -203,7 +203,7 @@ export function DirectorioPasivos({
       {pendientes.length === 0 ? (
         <p className="text-gray-400">No tienes deudas pendientes.</p>
       ) : (
-        <ul className="mb-6 divide-y divide-gray-100 rounded-lg border border-gray-200 px-4">
+        <ul className="mb-6 divide-y divide-gray-100 rounded-xl border border-gray-200 px-4">
           {pendientes.map((p) => (
             <FilaPasivo key={p.id} pasivo={p} pagos={pagosPorPasivo[p.id] ?? []} />
           ))}
@@ -213,7 +213,7 @@ export function DirectorioPasivos({
       {pagados.length > 0 && (
         <>
           <h2 className="mb-2 text-sm font-semibold text-gray-900">Pagadas</h2>
-          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 px-4">
+          <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 px-4">
             {pagados.map((p) => (
               <FilaPasivo key={p.id} pasivo={p} pagos={pagosPorPasivo[p.id] ?? []} />
             ))}
