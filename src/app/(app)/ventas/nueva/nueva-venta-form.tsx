@@ -9,8 +9,28 @@ import { buscarClientes, guardarVenta, type ClienteEncontrado } from "./actions"
 type ItemCatalogo = {
   id: string;
   nombre: string;
+  categoria: string | null;
   precio_venta: number | null;
   marca: string | null;
+};
+
+type Promocion = {
+  id: string;
+  nombre: string;
+  tipoPromocion: "descuento_porcentaje" | "descuento_fijo" | "2x1" | "lleve_x_gratis";
+  valor: number | null;
+  aplicaACategoria: string | null;
+  itemIds: string[];
+  itemRegaloId: string | null;
+  regaloNombre: string | null;
+  regaloPrecio: number;
+};
+
+const etiquetaTipoPromocion: Record<Promocion["tipoPromocion"], string> = {
+  descuento_porcentaje: "Descuento %",
+  descuento_fijo: "Descuento fijo",
+  "2x1": "2x1",
+  lleve_x_gratis: "Lleve X gratis",
 };
 
 const etiquetaMetodoPago: Record<string, string> = {
@@ -29,6 +49,9 @@ type LineaVenta = {
   mostrarSugerenciasProducto: boolean;
   cantidad: number;
   precioUnitario: number;
+  precioOriginal: number;
+  promocionId: string | null;
+  esGratis: boolean;
 };
 
 function nuevaLinea(): LineaVenta {
@@ -39,6 +62,9 @@ function nuevaLinea(): LineaVenta {
     mostrarSugerenciasProducto: false,
     cantidad: 1,
     precioUnitario: 0,
+    precioOriginal: 0,
+    promocionId: null,
+    esGratis: false,
   };
 }
 
@@ -55,9 +81,11 @@ function filtrarItems(items: ItemCatalogo[], query: string) {
 export function NuevaVentaForm({
   items,
   metodosPago,
+  promociones,
 }: {
   items: ItemCatalogo[];
   metodosPago: string[];
+  promociones: Promocion[];
 }) {
   const router = useRouter();
 
@@ -135,8 +163,71 @@ export function NuevaVentaForm({
       itemId: item.id,
       busquedaProducto: item.marca ? `${item.nombre} — ${item.marca}` : item.nombre,
       precioUnitario: item.precio_venta ?? 0,
+      precioOriginal: item.precio_venta ?? 0,
+      promocionId: null,
       mostrarSugerenciasProducto: false,
     });
+  }
+
+  function promocionesAplicables(itemId: string): Promocion[] {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return [];
+    return promociones.filter((promo) => {
+      if (promo.itemIds.length > 0) return promo.itemIds.includes(item.id);
+      if (promo.aplicaACategoria) return promo.aplicaACategoria === item.categoria;
+      return true;
+    });
+  }
+
+  function aplicarPromocion(linea: LineaVenta, promo: Promocion | null) {
+    if (!promo) {
+      actualizarLinea(linea.key, { promocionId: null, precioUnitario: linea.precioOriginal });
+      return;
+    }
+    if (promo.tipoPromocion === "descuento_porcentaje") {
+      const nuevoPrecio = Math.round(linea.precioOriginal * (1 - (promo.valor ?? 0) / 100));
+      actualizarLinea(linea.key, { promocionId: promo.id, precioUnitario: Math.max(0, nuevoPrecio) });
+    } else if (promo.tipoPromocion === "descuento_fijo") {
+      const nuevoPrecio = linea.precioOriginal - (promo.valor ?? 0);
+      actualizarLinea(linea.key, { promocionId: promo.id, precioUnitario: Math.max(0, nuevoPrecio) });
+    } else {
+      actualizarLinea(linea.key, { promocionId: promo.id, precioUnitario: linea.precioOriginal });
+    }
+  }
+
+  function agregarUnidadGratis(linea: LineaVenta, promo: Promocion) {
+    setLineas((actual) => [
+      ...actual,
+      {
+        key: crypto.randomUUID(),
+        itemId: linea.itemId,
+        busquedaProducto: linea.busquedaProducto,
+        mostrarSugerenciasProducto: false,
+        cantidad: 1,
+        precioUnitario: 0,
+        precioOriginal: linea.precioOriginal,
+        promocionId: promo.id,
+        esGratis: true,
+      },
+    ]);
+  }
+
+  function agregarRegalo(promo: Promocion) {
+    if (!promo.itemRegaloId) return;
+    setLineas((actual) => [
+      ...actual,
+      {
+        key: crypto.randomUUID(),
+        itemId: promo.itemRegaloId!,
+        busquedaProducto: promo.regaloNombre ?? "Regalo",
+        mostrarSugerenciasProducto: false,
+        cantidad: 1,
+        precioUnitario: 0,
+        precioOriginal: promo.regaloPrecio,
+        promocionId: promo.id,
+        esGratis: true,
+      },
+    ]);
   }
 
   const total = lineas.reduce((suma, linea) => suma + linea.cantidad * linea.precioUnitario, 0);
@@ -180,6 +271,12 @@ export function NuevaVentaForm({
           itemId: linea.itemId,
           cantidad: linea.cantidad,
           precioUnitario: linea.precioUnitario,
+          promocionId: linea.promocionId,
+          descuentoAplicado: linea.esGratis
+            ? linea.precioOriginal * linea.cantidad
+            : linea.promocionId
+              ? Math.max(0, linea.precioOriginal - linea.precioUnitario) * linea.cantidad
+              : 0,
         })),
       });
       if (resultado.error) {
@@ -266,83 +363,182 @@ export function NuevaVentaForm({
     <section key="productos" className="rounded-lg border border-gray-200 p-4">
       <h2 className="mb-4 text-sm font-semibold text-gray-900">Productos</h2>
       <div className="space-y-3">
-        {lineas.map((linea) => (
-          <div key={linea.key} className="grid grid-cols-12 items-end gap-2">
-            <div className="relative col-span-6">
-              <label className="mb-1 block text-xs font-medium text-gray-700">Producto *</label>
-              <input
-                value={linea.busquedaProducto}
-                onChange={(e) => buscarProducto(linea.key, e.target.value)}
-                onFocus={() =>
-                  actualizarLinea(linea.key, { mostrarSugerenciasProducto: true })
-                }
-                onBlur={() =>
-                  setTimeout(
-                    () => actualizarLinea(linea.key, { mostrarSugerenciasProducto: false }),
-                    150,
-                  )
-                }
-                placeholder="Busca por nombre o marca"
-                className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
-              />
-              {linea.mostrarSugerenciasProducto &&
-                filtrarItems(items, linea.busquedaProducto).length > 0 && (
-                  <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
-                    {filtrarItems(items, linea.busquedaProducto).map((item) => (
-                      <li key={item.id}>
-                        <button
-                          type="button"
-                          onMouseDown={() => seleccionarProducto(linea.key, item)}
-                          className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                        >
-                          {item.nombre}
-                          {item.marca && (
-                            <span className="ml-2 text-gray-400">{item.marca}</span>
-                          )}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-            </div>
-            <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-gray-700">Cantidad *</label>
-              <input
-                type="number"
-                min={1}
-                value={linea.cantidad}
-                onChange={(e) =>
-                  actualizarLinea(linea.key, { cantidad: Number(e.target.value) || 0 })
-                }
-                className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
-              />
-            </div>
-            <div className="col-span-3">
-              <label className="mb-1 block text-xs font-medium text-gray-700">
-                Precio unitario
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={linea.precioUnitario}
-                onChange={(e) =>
-                  actualizarLinea(linea.key, { precioUnitario: Number(e.target.value) || 0 })
-                }
-                className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
-              />
-            </div>
-            <div className="col-span-1 flex justify-end">
-              <button
-                type="button"
-                onClick={() => quitarLinea(linea.key)}
-                className="text-sm text-red-500 hover:text-red-700"
-                aria-label="Quitar producto"
+        {lineas.map((linea) => {
+          if (linea.esGratis) {
+            return (
+              <div
+                key={linea.key}
+                className="grid grid-cols-12 items-end gap-2 rounded bg-green-50 px-2 py-2"
               >
-                ✕
-              </button>
+                <div className="col-span-6">
+                  <p className="text-xs font-medium text-gray-700">Producto</p>
+                  <p className="text-sm text-gray-900">{linea.busquedaProducto}</p>
+                  <p className="text-xs text-green-700">Gratis (promoción)</p>
+                </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Cantidad *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={linea.cantidad}
+                    onChange={(e) =>
+                      actualizarLinea(linea.key, { cantidad: Number(e.target.value) || 0 })
+                    }
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <p className="text-xs font-medium text-gray-700">Precio unitario</p>
+                  <p className="rounded border border-gray-200 bg-white px-2 py-2 text-sm text-gray-500">
+                    $0
+                  </p>
+                </div>
+                <div className="col-span-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => quitarLinea(linea.key)}
+                    className="text-sm text-red-500 hover:text-red-700"
+                    aria-label="Quitar producto"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          const aplicables = promocionesAplicables(linea.itemId);
+          const promoSeleccionada = aplicables.find((p) => p.id === linea.promocionId) ?? null;
+
+          return (
+            <div key={linea.key} className="space-y-1">
+              <div className="grid grid-cols-12 items-end gap-2">
+                <div className="relative col-span-6">
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Producto *</label>
+                  <input
+                    value={linea.busquedaProducto}
+                    onChange={(e) => buscarProducto(linea.key, e.target.value)}
+                    onFocus={() =>
+                      actualizarLinea(linea.key, { mostrarSugerenciasProducto: true })
+                    }
+                    onBlur={() =>
+                      setTimeout(
+                        () => actualizarLinea(linea.key, { mostrarSugerenciasProducto: false }),
+                        150,
+                      )
+                    }
+                    placeholder="Busca por nombre o marca"
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                  />
+                  {linea.mostrarSugerenciasProducto &&
+                    filtrarItems(items, linea.busquedaProducto).length > 0 && (
+                      <ul className="absolute z-10 mt-1 w-full rounded border border-gray-200 bg-white shadow-sm">
+                        {filtrarItems(items, linea.busquedaProducto).map((item) => (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              onMouseDown={() => seleccionarProducto(linea.key, item)}
+                              className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                            >
+                              {item.nombre}
+                              {item.marca && (
+                                <span className="ml-2 text-gray-400">{item.marca}</span>
+                              )}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Cantidad *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={linea.cantidad}
+                    onChange={(e) =>
+                      actualizarLinea(linea.key, { cantidad: Number(e.target.value) || 0 })
+                    }
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
+                    Precio unitario
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={linea.precioUnitario}
+                    onChange={(e) =>
+                      actualizarLinea(linea.key, { precioUnitario: Number(e.target.value) || 0 })
+                    }
+                    className="w-full rounded border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                  />
+                </div>
+                <div className="col-span-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => quitarLinea(linea.key)}
+                    className="text-sm text-red-500 hover:text-red-700"
+                    aria-label="Quitar producto"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {linea.itemId && aplicables.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pl-1">
+                  <select
+                    value={linea.promocionId ?? ""}
+                    onChange={(e) => {
+                      const promo = aplicables.find((p) => p.id === e.target.value) ?? null;
+                      aplicarPromocion(linea, promo);
+                    }}
+                    className="rounded border border-gray-300 px-2 py-1 text-xs focus:border-gray-500 focus:outline-none"
+                  >
+                    <option value="">Sin promoción</option>
+                    {aplicables.map((promo) => (
+                      <option key={promo.id} value={promo.id}>
+                        {promo.nombre} ({etiquetaTipoPromocion[promo.tipoPromocion]})
+                      </option>
+                    ))}
+                  </select>
+
+                  {promoSeleccionada?.tipoPromocion === "2x1" && (
+                    <button
+                      type="button"
+                      onClick={() => agregarUnidadGratis(linea, promoSeleccionada)}
+                      className="rounded border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50"
+                    >
+                      + Unidad gratis (2x1)
+                    </button>
+                  )}
+                  {promoSeleccionada?.tipoPromocion === "lleve_x_gratis" && (
+                    <button
+                      type="button"
+                      onClick={() => agregarRegalo(promoSeleccionada)}
+                      className="rounded border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50"
+                    >
+                      + Regalo: {promoSeleccionada.regaloNombre}
+                    </button>
+                  )}
+                  {promoSeleccionada &&
+                    (promoSeleccionada.tipoPromocion === "descuento_porcentaje" ||
+                      promoSeleccionada.tipoPromocion === "descuento_fijo") && (
+                      <span className="text-xs text-green-700">
+                        Descuento:{" "}
+                        {(
+                          Math.max(0, linea.precioOriginal - linea.precioUnitario) * linea.cantidad
+                        ).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+                      </span>
+                    )}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button

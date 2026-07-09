@@ -39,6 +39,8 @@ export type ItemVentaInput = {
   itemId: string;
   cantidad: number;
   precioUnitario: number;
+  promocionId: string | null;
+  descuentoAplicado: number;
 };
 
 export async function guardarVenta(input: {
@@ -78,6 +80,8 @@ export async function guardarVenta(input: {
       item_id: item.itemId,
       cantidad: item.cantidad,
       precio_unitario: item.precioUnitario,
+      promocion_id: item.promocionId,
+      descuento_aplicado: item.descuentoAplicado,
     })),
     p_fecha: input.fecha,
     p_metodo_pago: input.metodoPago,
