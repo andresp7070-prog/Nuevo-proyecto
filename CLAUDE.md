@@ -132,15 +132,17 @@ Para cuando una empresa nueva viene de otra herramienta (Siigo, Alegra, una hoja
 No adelantes fases sin que yo lo pida. Prefiero un módulo bien hecho que cinco a medias. Dentro de cada fase, primero la lógica y los datos correctos, las gráficas y visualizaciones van al final.
 
 ## Planes y precios (para decidir qué módulo mostrarle a cada empresa)
-**Todavía no están definidos en firme** — lo de abajo es un punto de partida de una conversación anterior, no una decisión cerrada. No lo trates como definitivo hasta que yo lo confirme explícitamente.
+**La estructura ya está decidida: suscripción mensual pura, sin ningún cobro inicial de implementación.** Los montos exactos de cada plan todavía no están en firme — lo de abajo es un punto de partida, no una decisión cerrada. No lo trates como definitivo hasta que yo lo confirme explícitamente.
 
-| Plan | Módulos incluidos | Implementación | Mensual |
-|---|---|---|---|
-| Básico | Ventas + CRM | $1.100.000 COP | $200.000 COP/mes |
-| Pro | + Inventario + Estado P y G | $2.100.000 COP | $350.000 COP/mes |
-| Full | + Proyecciones e Insights | $3.400.000 COP | $500.000 COP/mes |
+| Plan | Módulos incluidos | Mensual |
+|---|---|---|
+| Básico | Ventas + CRM | $200.000 COP/mes |
+| Pro | + Inventario + Estado P y G | $350.000 COP/mes |
+| Full | + Proyecciones e Insights | $500.000 COP/mes |
 
 Descuentos y promociones va a ser su propio módulo — falta decidir en qué plan entra o si es un add-on aparte.
+
+**Desarrollo específico para un cliente se cobra aparte, fuera de la suscripción.** Si una empresa cabe en la plataforma tal como está — usando `atributos` (JSON) para lo que varía por su tipo de negocio, sin tocar el esquema ni el código — no hay ningún cobro adicional, la suscripción mensual ya lo cubre. Pero si un cliente de verdad necesita algo que requiere código nuevo (una tabla propia, una integración, una función de negocio a la medida — el mismo criterio que ya usa este archivo para decidir cuándo algo amerita tabla propia en vez de `atributos`), ese trabajo se cotiza y se cobra aparte, como un proyecto puntual. Todavía falta definir cómo se cotiza ese trabajo a la medida (por horas, por alcance fijo, etc.) — no asumas una tarifa ni un formato hasta que yo lo confirme.
 
 ## Cobros
 Por ahora, manuales (transferencia + factura de venta simple). No integrar ninguna pasarela de pagos todavía — eso viene después de validar con los primeros clientes reales.
