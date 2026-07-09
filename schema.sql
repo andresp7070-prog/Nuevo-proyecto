@@ -645,6 +645,14 @@ $$;
 create policy "ver mi propia empresa" on empresas
   for select using (id = mi_empresa_id() or es_admin());
 
+-- Solo permite actualizar (nunca crear ni borrar) la propia fila de empresa.
+-- En la práctica, el único código de la aplicación que escribe aquí es
+-- subirLogoEmpresa(), que solo toca logo_path — el resto de campos
+-- (plan, módulos activos, etc.) siguen siendo de administración manual.
+create policy "actualizar mi propia empresa" on empresas
+  for update using (id = mi_empresa_id() or es_admin())
+  with check (id = mi_empresa_id() or es_admin());
+
 create policy "ver mi propio perfil" on perfiles
   for select using (id = auth.uid() or es_admin());
 
