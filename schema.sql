@@ -34,6 +34,7 @@ create table empresas (
   -- empresa activa cuáles acepta. Editable por ahora en la tabla de Supabase.
   metodos_pago_disponibles text[] not null default '{efectivo,tarjeta,transferencia}'
     check (metodos_pago_disponibles <@ array['efectivo','tarjeta','transferencia','nequi','daviplata','otro']::text[]),
+  logo_path text,  -- ruta dentro del bucket 'empresas-logos' de Supabase Storage; opcional
   created_at timestamptz default now()
 );
 
@@ -733,6 +734,36 @@ create policy "actualizar fotos de mi empresa" on storage.objects
 create policy "borrar fotos de mi empresa" on storage.objects
   for delete using (
     bucket_id = 'inventario-fotos'
+    and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
+  );
+
+-- Bucket separado para el logo de cada empresa — mismo patrón de RLS que
+-- las fotos de producto, pero con límite más pequeño (2MB) y permitiendo SVG.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('empresas-logos', 'empresas-logos', false, 2097152, array['image/jpeg','image/png','image/webp','image/svg+xml'])
+on conflict (id) do nothing;
+
+create policy "ver logo de mi empresa" on storage.objects
+  for select using (
+    bucket_id = 'empresas-logos'
+    and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
+  );
+
+create policy "subir logo de mi empresa" on storage.objects
+  for insert with check (
+    bucket_id = 'empresas-logos'
+    and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
+  );
+
+create policy "actualizar logo de mi empresa" on storage.objects
+  for update using (
+    bucket_id = 'empresas-logos'
+    and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
+  );
+
+create policy "borrar logo de mi empresa" on storage.objects
+  for delete using (
+    bucket_id = 'empresas-logos'
     and ((storage.foldername(name))[1] = mi_empresa_id()::text or es_admin())
   );
 

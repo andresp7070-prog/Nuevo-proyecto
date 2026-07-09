@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { primeraMayuscula } from "@/lib/texto";
+import { firmarFotoUrl } from "@/lib/fotos";
+import { LogoEmpresa } from "./logo-empresa";
 
 function formatoMoneda(valor: number) {
   return valor.toLocaleString("es-CO", { style: "currency", currency: "COP" });
@@ -42,7 +44,7 @@ export default async function ResumenPage() {
     { data: pasivosData },
     { data: itemsAgotadosData },
   ] = await Promise.all([
-    supabase.from("empresas").select("nombre").eq("id", perfil.empresa_id).single(),
+    supabase.from("empresas").select("nombre, logo_path").eq("id", perfil.empresa_id).single(),
     supabase.from("ventas").select("fecha, monto").eq("empresa_id", perfil.empresa_id),
     supabase
       .from("vista_estado_resultados")
@@ -96,6 +98,8 @@ export default async function ResumenPage() {
   // ---- Inventario agotado ----
   const itemsAgotados = (itemsAgotadosData ?? []) as { id: string; nombre: string; cantidad: number; unidad: string }[];
 
+  const logoUrl = await firmarFotoUrl(supabase, empresa?.logo_path ?? null, "empresas-logos");
+
   const fechaLegible = primeraMayuscula(
     new Date().toLocaleDateString("es-CO", {
       timeZone: "America/Bogota",
@@ -107,11 +111,14 @@ export default async function ResumenPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold text-gray-900">
-          Hola, {empresa?.nombre ?? "bienvenido"}
-        </h1>
-        <p className="text-sm text-gray-400">{fechaLegible}</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">
+            Hola, {empresa?.nombre ?? "bienvenido"}
+          </h1>
+          <p className="text-sm text-gray-400">{fechaLegible}</p>
+        </div>
+        <LogoEmpresa logoUrl={logoUrl} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
