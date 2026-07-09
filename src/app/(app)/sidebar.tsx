@@ -38,12 +38,6 @@ export function Sidebar({ modulosActivos }: { modulosActivos: string[] }) {
             </li>
           );
         })}
-        <li>
-          <span className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-gray-400">
-            Facturación
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs">Próximamente</span>
-          </span>
-        </li>
       </ul>
     </nav>
   );
