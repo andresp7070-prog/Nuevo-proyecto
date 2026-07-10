@@ -51,7 +51,7 @@ type LineaVenta = {
   itemId: string;
   busquedaProducto: string;
   mostrarSugerenciasProducto: boolean;
-  cantidad: number;
+  cantidad: number | "";
   precioUnitario: number;
   precioOriginal: number;
   promocionId: string | null;
@@ -64,12 +64,20 @@ function nuevaLinea(): LineaVenta {
     itemId: "",
     busquedaProducto: "",
     mostrarSugerenciasProducto: false,
-    cantidad: 1,
+    cantidad: "",
     precioUnitario: 0,
     precioOriginal: 0,
     promocionId: null,
     esGratis: false,
   };
+}
+
+// Solo números enteros — sin puntos, comas ni signos, aunque el campo permita
+// escribirlos momentáneamente (ej. al intentar un decimal).
+function cantidadDesdeInput(valorCrudo: string): number | "" {
+  const soloDigitos = valorCrudo.replace(/[^\d]/g, "");
+  if (soloDigitos === "") return "";
+  return Number(soloDigitos);
 }
 
 function filtrarItems(items: ItemCatalogo[], query: string) {
@@ -238,13 +246,19 @@ export function NuevaVentaForm({
     ]);
   }
 
-  const total = lineas.reduce((suma, linea) => suma + linea.cantidad * linea.precioUnitario, 0);
+  const total = lineas.reduce(
+    (suma, linea) => suma + (linea.cantidad === "" ? 0 : linea.cantidad) * linea.precioUnitario,
+    0,
+  );
 
   async function guardar() {
     setError(null);
     setVentaGuardada(false);
 
-    const lineasValidas = lineas.filter((linea) => linea.itemId && linea.cantidad > 0);
+    const lineasValidas = lineas.filter(
+      (linea): linea is LineaVenta & { cantidad: number } =>
+        Boolean(linea.itemId) && linea.cantidad !== "" && linea.cantidad > 0,
+    );
     if (lineasValidas.length === 0) {
       setError("Agrega al menos un producto con cantidad mayor a cero.");
       return;
@@ -420,9 +434,11 @@ export function NuevaVentaForm({
                   <input
                     type="number"
                     min={1}
+                    step={1}
+                    inputMode="numeric"
                     value={linea.cantidad}
                     onChange={(e) =>
-                      actualizarLinea(linea.key, { cantidad: Number(e.target.value) || 0 })
+                      actualizarLinea(linea.key, { cantidad: cantidadDesdeInput(e.target.value) })
                     }
                     className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                   />
@@ -495,9 +511,11 @@ export function NuevaVentaForm({
                   <input
                     type="number"
                     min={1}
+                    step={1}
+                    inputMode="numeric"
                     value={linea.cantidad}
                     onChange={(e) =>
-                      actualizarLinea(linea.key, { cantidad: Number(e.target.value) || 0 })
+                      actualizarLinea(linea.key, { cantidad: cantidadDesdeInput(e.target.value) })
                     }
                     className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
                   />
@@ -602,7 +620,8 @@ export function NuevaVentaForm({
                       <span className="text-xs text-green-700">
                         Descuento:{" "}
                         {(
-                          Math.max(0, linea.precioOriginal - linea.precioUnitario) * linea.cantidad
+                          Math.max(0, linea.precioOriginal - linea.precioUnitario) *
+                          (linea.cantidad === "" ? 0 : linea.cantidad)
                         ).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
                       </span>
                     )}
