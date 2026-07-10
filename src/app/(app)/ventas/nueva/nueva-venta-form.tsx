@@ -113,6 +113,7 @@ export function NuevaVentaForm({
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ventaGuardada, setVentaGuardada] = useState(false);
 
   useEffect(() => {
     if (!crmActivo) return;
@@ -241,6 +242,7 @@ export function NuevaVentaForm({
 
   async function guardar() {
     setError(null);
+    setVentaGuardada(false);
 
     const lineasValidas = lineas.filter((linea) => linea.itemId && linea.cantidad > 0);
     if (lineasValidas.length === 0) {
@@ -308,7 +310,21 @@ export function NuevaVentaForm({
         setGuardando(false);
         return;
       }
-      router.push("/ventas?guardada=1");
+
+      // Nos quedamos en esta pantalla para poder registrar la siguiente venta rápido,
+      // en vez de mandar de vuelta al listado general.
+      setVentaGuardada(true);
+      setLineas([nuevaLinea()]);
+      setNombre("");
+      setTelefono("");
+      setEmail("");
+      setContactoId(null);
+      setSugerencias([]);
+      setBusquedaClienteLista(false);
+      setFecha(ahoraFecha());
+      setHora(ahoraHora());
+      setGuardando(false);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar la venta.");
       setGuardando(false);
@@ -473,35 +489,6 @@ export function NuevaVentaForm({
                         ))}
                       </ul>
                     )}
-                  {linea.itemId &&
-                    (() => {
-                      const itemSeleccionado = items.find((i) => i.id === linea.itemId);
-                      if (!itemSeleccionado) return null;
-                      return (
-                        <p className="mt-1 text-xs text-gray-500">
-                          Quedan {itemSeleccionado.cantidad} {etiquetaUnidad(itemSeleccionado.unidad)}
-                          {itemSeleccionado.diasRestantes !== null ? (
-                            <>
-                              {" "}
-                              — a este ritmo,{" "}
-                              <span
-                                className={
-                                  itemSeleccionado.diasRestantes <= 3
-                                    ? "font-medium text-red-600"
-                                    : itemSeleccionado.diasRestantes <= 7
-                                      ? "font-medium text-amber-600"
-                                      : ""
-                                }
-                              >
-                                se {itemSeleccionado.diasRestantes === 0 ? "acaba hoy" : `acaba en ~${itemSeleccionado.diasRestantes} día(s)`}
-                              </span>
-                            </>
-                          ) : (
-                            " — aún no hay suficientes ventas para proyectar cuándo se acaba"
-                          )}
-                        </p>
-                      );
-                    })()}
                 </div>
                 <div className="col-span-2">
                   <label className="mb-1 block text-xs font-medium text-gray-700">Cantidad *</label>
@@ -540,6 +527,38 @@ export function NuevaVentaForm({
                   </button>
                 </div>
               </div>
+
+              {linea.itemId &&
+                (() => {
+                  const itemSeleccionado = items.find((i) => i.id === linea.itemId);
+                  if (!itemSeleccionado) return null;
+                  return (
+                    <div className="grid grid-cols-12 gap-2">
+                      <p className="col-span-6 text-xs text-gray-500">
+                        Quedan {itemSeleccionado.cantidad} {etiquetaUnidad(itemSeleccionado.unidad)}
+                        {itemSeleccionado.diasRestantes !== null ? (
+                          <>
+                            {" "}
+                            — a este ritmo,{" "}
+                            <span
+                              className={
+                                itemSeleccionado.diasRestantes <= 3
+                                  ? "font-medium text-red-600"
+                                  : itemSeleccionado.diasRestantes <= 7
+                                    ? "font-medium text-amber-600"
+                                    : ""
+                              }
+                            >
+                              se {itemSeleccionado.diasRestantes === 0 ? "acaba hoy" : `acaba en ~${itemSeleccionado.diasRestantes} día(s)`}
+                            </span>
+                          </>
+                        ) : (
+                          " — aún no hay suficientes ventas para proyectar cuándo se acaba"
+                        )}
+                      </p>
+                    </div>
+                  );
+                })()}
 
               {linea.itemId && aplicables.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 pl-1">
@@ -651,6 +670,12 @@ export function NuevaVentaForm({
           </button>
         )}
       </div>
+
+      {ventaGuardada && (
+        <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+          Venta agregada correctamente.
+        </p>
+      )}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <div>
