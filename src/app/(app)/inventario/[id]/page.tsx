@@ -5,6 +5,7 @@ import { etiquetaUnidad } from "@/lib/unidades";
 import { calcularMaxProducible } from "@/lib/inventario";
 import { firmarFotoUrl } from "@/lib/fotos";
 import { FotoProducto } from "./foto-producto";
+import { AjustarInventario } from "./ajustar-inventario";
 
 type RecetaFila = {
   cantidad_insumo: number;
@@ -108,11 +109,19 @@ export default async function FichaProductoPage({
             <p className="font-medium text-gray-900">{formatoMoneda(item.precio_venta)}</p>
           </div>
         </div>
-        {maxProducible !== null && (
+        {maxProducible !== null ? (
           <p className="mt-2 text-xs text-gray-400">
             Se calcula solo, según el insumo de la receta que menos tengas disponible — no es un
             número que se guarde.
           </p>
+        ) : (
+          <div className="mt-4">
+            <AjustarInventario
+              itemId={item.id}
+              cantidadActual={item.cantidad}
+              unidad={etiquetaUnidad(item.unidad)}
+            />
+          </div>
         )}
       </div>
 

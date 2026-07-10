@@ -250,6 +250,45 @@ as $$
   where id = p_item_id;
 $$;
 
+-- Corrige la cantidad en stock a lo que de verdad hay — pérdida, daño, o un
+-- conteo físico que no coincide con el sistema. A diferencia de reabastecer
+-- (que siempre suma), esto fija el número exacto y deja un movimiento en
+-- inventario_movimientos con motivo 'ajuste' como registro de por qué cambió.
+create or replace function ajustar_inventario(
+  p_item_id uuid,
+  p_cantidad_real numeric,
+  p_nota text default null
+)
+returns void
+language plpgsql
+as $$
+declare
+  v_cantidad_actual numeric(12,2);
+  v_diferencia numeric(12,2);
+begin
+  select cantidad into v_cantidad_actual from inventario_items where id = p_item_id;
+  if v_cantidad_actual is null then
+    raise exception 'Producto no encontrado';
+  end if;
+
+  v_diferencia := p_cantidad_real - v_cantidad_actual;
+  if v_diferencia = 0 then
+    return;
+  end if;
+
+  insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
+  values (
+    p_item_id,
+    case when v_diferencia > 0 then 'entrada' else 'salida' end,
+    'ajuste',
+    abs(v_diferencia),
+    p_nota
+  );
+
+  update inventario_items set cantidad = p_cantidad_real where id = p_item_id;
+end;
+$$;
+
 -- ------------------------------------------------------------
 -- 9. FINANZAS — alimenta el estado de pérdidas y ganancias
 -- ------------------------------------------------------------

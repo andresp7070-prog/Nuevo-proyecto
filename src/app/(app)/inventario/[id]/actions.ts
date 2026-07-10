@@ -71,3 +71,24 @@ export async function subirFotoProducto(
 
   return { error: null, path };
 }
+
+export async function ajustarInventario(input: {
+  itemId: string;
+  cantidadReal: number;
+  nota: string;
+}): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No hay sesión activa." };
+
+  const { error } = await supabase.rpc("ajustar_inventario", {
+    p_item_id: input.itemId,
+    p_cantidad_real: input.cantidadReal,
+    p_nota: input.nota || null,
+  });
+
+  if (error) return { error: error.message };
+  return { error: null };
+}
