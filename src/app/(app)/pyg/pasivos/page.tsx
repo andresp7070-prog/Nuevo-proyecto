@@ -25,7 +25,7 @@ export default async function PasivosPage() {
 
   const { data: pasivos } = await supabase
     .from("pasivos")
-    .select("id, descripcion, tipo, monto_total, monto_pagado, fecha_vencimiento, estado")
+    .select("id, descripcion, tipo, monto_total, monto_pagado, fecha_vencimiento, estado, frecuencia_pago")
     .eq("empresa_id", perfil.empresa_id)
     .order("fecha_vencimiento", { ascending: true, nullsFirst: false });
 

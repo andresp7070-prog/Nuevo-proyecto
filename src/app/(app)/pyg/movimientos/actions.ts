@@ -8,6 +8,8 @@ export async function crearMovimiento(input: {
   monto: number;
   fecha: string;
   nota: string;
+  recurrente: boolean;
+  frecuencia: string;
 }): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {
@@ -32,6 +34,8 @@ export async function crearMovimiento(input: {
     monto: input.monto,
     fecha: input.fecha,
     nota: input.nota || null,
+    recurrente: input.recurrente,
+    frecuencia: input.frecuencia || null,
   });
 
   if (error) return { error: error.message };
