@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 export async function crearProveedor(input: {
   nombre: string;
   telefono: string;
-  condicionPago: string;
+  frecuenciaPago: string;
+  diaSemanaPago: string | null;
+  diasPersonalizado: number | null;
 }): Promise<{ error: string | null; id?: string }> {
   const supabase = await createClient();
   const {
@@ -29,7 +31,9 @@ export async function crearProveedor(input: {
       empresa_id: perfil.empresa_id,
       nombre: input.nombre,
       telefono: input.telefono || null,
-      condicion_pago: input.condicionPago,
+      frecuencia_pago: input.frecuenciaPago,
+      dia_semana_pago: input.diaSemanaPago,
+      dias_personalizado: input.diasPersonalizado,
     })
     .select("id")
     .single();

@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { etiquetaUnidad } from "@/lib/unidades";
 import { calcularMaxProducible } from "@/lib/inventario";
-import { etiquetaCondicionPago } from "@/lib/proveedores";
+import { etiquetaFrecuenciaPago } from "@/lib/proveedores";
 import { firmarFotoUrl } from "@/lib/fotos";
 import { FotoProducto } from "./foto-producto";
 import { AjustarInventario } from "./ajustar-inventario";
@@ -34,7 +34,7 @@ export default async function FichaProductoPage({
   const { data: item } = await supabase
     .from("inventario_items")
     .select(
-      "id, nombre, categoria, unidad, cantidad, costo, precio_venta, foto_path, marca:atributos->>marca, contenido_por_unidad:atributos->>contenido_por_unidad, proveedor:proveedores ( nombre, condicion_pago )",
+      "id, nombre, categoria, unidad, cantidad, costo, precio_venta, foto_path, marca:atributos->>marca, contenido_por_unidad:atributos->>contenido_por_unidad, proveedor:proveedores ( nombre, frecuencia_pago, dia_semana_pago, dias_personalizado )",
     )
     .eq("id", id)
     .single();
@@ -79,7 +79,12 @@ export default async function FichaProductoPage({
               )}
               {proveedor && (
                 <p className="mt-1 text-xs text-gray-400">
-                  Proveedor: {proveedor.nombre} · {etiquetaCondicionPago(proveedor.condicion_pago)}
+                  Proveedor: {proveedor.nombre} ·{" "}
+                  {etiquetaFrecuenciaPago(
+                    proveedor.frecuencia_pago,
+                    proveedor.dia_semana_pago,
+                    proveedor.dias_personalizado,
+                  )}
                 </p>
               )}
             </div>

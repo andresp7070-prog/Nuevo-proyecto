@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { InventarioTabs } from "../inventario-tabs";
-import { etiquetaCondicionPago } from "@/lib/proveedores";
+import { etiquetaFrecuenciaPago } from "@/lib/proveedores";
 
 export default async function ProveedoresPage() {
   const supabase = await createClient();
@@ -27,7 +27,7 @@ export default async function ProveedoresPage() {
 
   const { data: proveedores } = await supabase
     .from("proveedores")
-    .select("id, nombre, telefono, condicion_pago")
+    .select("id, nombre, telefono, frecuencia_pago, dia_semana_pago, dias_personalizado")
     .eq("empresa_id", perfil.empresa_id)
     .order("nombre");
 
@@ -55,7 +55,9 @@ export default async function ProveedoresPage() {
                 <p className="text-sm font-medium text-gray-900">{p.nombre}</p>
                 <p className="text-xs text-gray-400">{p.telefono || "Sin teléfono"}</p>
               </div>
-              <span className="text-sm text-gray-700">{etiquetaCondicionPago(p.condicion_pago)}</span>
+              <span className="text-sm text-gray-700">
+                {etiquetaFrecuenciaPago(p.frecuencia_pago, p.dia_semana_pago, p.dias_personalizado)}
+              </span>
             </li>
           ))}
         </ul>

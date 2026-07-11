@@ -126,8 +126,15 @@ create table proveedores (
   empresa_id uuid references empresas(id) not null,
   nombre text not null,
   telefono text,
-  condicion_pago text not null default 'contado'
-    check (condicion_pago in ('contado', '15_dias', '30_dias', '60_dias', '90_dias')),
+  frecuencia_pago text not null default 'contado'
+    check (frecuencia_pago in ('contado', 'diario', 'semanal', 'mensual', 'personalizado')),
+  -- Solo aplica cuando frecuencia_pago = 'semanal': qué día de la semana cae el pago
+  -- (ej. compras un viernes, pero el pago cae cada lunes).
+  dia_semana_pago text
+    check (dia_semana_pago is null or dia_semana_pago in
+      ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')),
+  -- Solo aplica cuando frecuencia_pago = 'personalizado': cada cuántos días se paga.
+  dias_personalizado int,
   created_at timestamptz default now()
 );
 
