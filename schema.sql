@@ -253,6 +253,13 @@ declare
   v_stock numeric(12,2);
   v_nombre text;
 begin
+  -- Una venta histórica importada (importar_ventas_historicas) no debe volver
+  -- a descontar inventario ni recalcular el costo — eso ya pasó de verdad con
+  -- el sistema anterior del cliente, y el costo ya viene puesto a mano.
+  if current_setting('app.importando_historico', true) = 'true' then
+    return new;
+  end if;
+
   if new.item_id is not null then
     select tipo, costo, cantidad, nombre into v_tipo, v_costo, v_stock, v_nombre
     from inventario_items where id = new.item_id;
@@ -1154,5 +1161,92 @@ begin
   end loop;
 
   return v_venta_id;
+end;
+$$;
+
+-- Carga masiva de ventas históricas: para una empresa que migra desde otra
+-- herramienta (o una hoja de Excel) y quiere conservar su historial de
+-- ventas. A diferencia de registrar_venta(), estas ventas NUNCA descuentan
+-- inventario ni recalculan costo por FIFO — ya pasaron de verdad en el
+-- sistema anterior del cliente, volver a descontarlas duplicaría el efecto.
+-- Cada fila es una venta de un solo producto (una fila del CSV = una línea
+-- vendida); si el producto no existe en el catálogo, la venta igual se
+-- guarda, solo queda sin ligar a inventario. Devuelve cuántas se importaron.
+create or replace function importar_ventas_historicas(
+  p_empresa_id uuid,
+  p_ventas jsonb  -- [{"fecha":"2026-03-01","cliente_nombre":"...","cliente_telefono":"...","cliente_email":"...","producto":"...","cantidad":1,"precio_unitario":1000,"costo_unitario":700,"metodo_pago":"efectivo"}, ...]
+)
+returns int
+language plpgsql
+as $$
+declare
+  v_fila jsonb;
+  v_item_id uuid;
+  v_contacto_id uuid;
+  v_venta_id uuid;
+  v_importadas int := 0;
+  v_cantidad numeric;
+  v_precio numeric;
+  v_costo numeric;
+begin
+  perform set_config('app.importando_historico', 'true', true);
+
+  for v_fila in select * from jsonb_array_elements(p_ventas)
+  loop
+    v_item_id := null;
+    if coalesce(v_fila->>'producto', '') <> '' then
+      select id into v_item_id
+      from inventario_items
+      where empresa_id = p_empresa_id and nombre = (v_fila->>'producto')
+      limit 1;
+    end if;
+
+    v_contacto_id := null;
+    if coalesce(v_fila->>'cliente_telefono', '') <> '' then
+      select id into v_contacto_id
+      from crm_contactos
+      where empresa_id = p_empresa_id and telefono = (v_fila->>'cliente_telefono')
+      limit 1;
+
+      if v_contacto_id is null then
+        insert into crm_contactos (empresa_id, nombre, telefono, email, etapa_pipeline)
+        values (
+          p_empresa_id,
+          coalesce(nullif(v_fila->>'cliente_nombre', ''), 'Cliente sin nombre'),
+          v_fila->>'cliente_telefono',
+          nullif(v_fila->>'cliente_email', ''),
+          'cerrado'
+        )
+        returning id into v_contacto_id;
+      else
+        update crm_contactos set etapa_pipeline = 'cerrado' where id = v_contacto_id;
+      end if;
+    end if;
+
+    v_cantidad := (v_fila->>'cantidad')::numeric;
+    v_precio := (v_fila->>'precio_unitario')::numeric;
+    v_costo := nullif(v_fila->>'costo_unitario', '')::numeric;
+    if v_costo is null and v_item_id is not null then
+      select costo into v_costo from inventario_items where id = v_item_id;
+    end if;
+
+    insert into ventas (empresa_id, fecha, monto, contacto_id, cliente_nombre, metodo_pago)
+    values (
+      p_empresa_id,
+      (v_fila->>'fecha')::timestamptz,
+      v_cantidad * v_precio,
+      v_contacto_id,
+      nullif(v_fila->>'cliente_nombre', ''),
+      nullif(v_fila->>'metodo_pago', '')
+    )
+    returning id into v_venta_id;
+
+    insert into ventas_items (venta_id, item_id, cantidad, precio_unitario, costo_unitario)
+    values (v_venta_id, v_item_id, v_cantidad, v_precio, v_costo);
+
+    v_importadas := v_importadas + 1;
+  end loop;
+
+  return v_importadas;
 end;
 $$;

@@ -22,11 +22,20 @@ function IconoCandado() {
   );
 }
 
+function LogoAsesorias() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <circle cx="24" cy="24" r="18" stroke="currentColor" strokeWidth="3" />
+      <path d="M24 12 L30 24 L24 36 L18 24 Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function Sidebar({ modulosActivos }: { modulosActivos: string[] }) {
   const pathname = usePathname();
 
   return (
-    <nav className="w-56 shrink-0 border-r border-gray-200 p-4">
+    <nav className="flex w-56 shrink-0 flex-col justify-between border-r border-gray-200 p-4">
       <ul className="space-y-1">
         {modulos.map((modulo) => {
           const habilitado = modulo.slug === null || modulosActivos.includes(modulo.slug);
@@ -60,6 +69,11 @@ export function Sidebar({ modulosActivos }: { modulosActivos: string[] }) {
           );
         })}
       </ul>
+
+      <div className="flex items-center gap-2 px-3 text-xs text-gray-400">
+        <LogoAsesorias />
+        <span>Desarrollado por Asesorías</span>
+      </div>
     </nav>
   );
 }
