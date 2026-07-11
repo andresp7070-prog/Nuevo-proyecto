@@ -87,7 +87,7 @@ export function AjustarInventario({
           type="button"
           onClick={guardar}
           disabled={guardando}
-          className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
           {guardando ? "Guardando..." : "Guardar"}
         </button>

@@ -169,7 +169,7 @@ export default async function PygPage({
           </Link>
           <Link
             href="/pyg/pasivos"
-            className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover"
           >
             Deudas
           </Link>
@@ -183,7 +183,7 @@ export default async function PygPage({
             href={`/pyg?mes=${f.mes.slice(0, 10)}`}
             className={`rounded-lg px-3 py-1.5 text-sm ${
               f.mes.slice(0, 7) === mesSeleccionado.slice(0, 7)
-                ? "bg-gray-900 text-white"
+                ? "bg-accent text-white"
                 : "border border-gray-300 text-gray-700 hover:bg-gray-100"
             }`}
           >

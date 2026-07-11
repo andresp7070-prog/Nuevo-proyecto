@@ -225,7 +225,7 @@ export default async function ResumenPage() {
         <div className="flex flex-wrap gap-3">
           <Link
             href="/ventas/nueva"
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
           >
             Agregar venta
           </Link>

@@ -22,7 +22,7 @@ export function VentasTabs() {
             href={pestana.href}
             className={`border-b-2 px-1 pb-2 text-sm font-medium ${
               activa
-                ? "border-gray-900 text-gray-900"
+                ? "border-accent text-accent"
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >

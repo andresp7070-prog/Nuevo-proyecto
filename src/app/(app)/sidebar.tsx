@@ -51,7 +51,7 @@ export function Sidebar({ modulosActivos }: { modulosActivos: string[] }) {
               <Link
                 href={modulo.href}
                 className={`block rounded-lg px-3 py-2 text-sm font-medium ${
-                  activo ? "bg-gray-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  activo ? "bg-accent text-white" : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
                 {modulo.nombre}

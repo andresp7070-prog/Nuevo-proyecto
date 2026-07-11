@@ -205,7 +205,7 @@ export function ImportarInventarioForm() {
               type="button"
               onClick={confirmar}
               disabled={cargando}
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
             >
               {cargando ? "Importando..." : `Confirmar carga de ${filas.length} producto(s)`}
             </button>

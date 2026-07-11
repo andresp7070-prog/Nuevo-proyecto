@@ -77,7 +77,7 @@ export function NuevoMovimientoForm() {
               onClick={() => setTipo("gasto")}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
                 tipo === "gasto"
-                  ? "border-gray-900 bg-gray-900 text-white"
+                  ? "border-accent bg-accent text-white"
                   : "border-gray-300 text-gray-700 hover:bg-gray-50"
               }`}
             >
@@ -88,7 +88,7 @@ export function NuevoMovimientoForm() {
               onClick={() => setTipo("ingreso")}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
                 tipo === "ingreso"
-                  ? "border-gray-900 bg-gray-900 text-white"
+                  ? "border-accent bg-accent text-white"
                   : "border-gray-300 text-gray-700 hover:bg-gray-50"
               }`}
             >
@@ -174,7 +174,7 @@ export function NuevoMovimientoForm() {
         type="button"
         onClick={guardar}
         disabled={guardando}
-        className="mt-6 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="mt-6 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
       >
         {guardando ? "Guardando..." : "Guardar"}
       </button>
