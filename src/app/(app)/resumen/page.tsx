@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { primeraMayuscula } from "@/lib/texto";
 import { firmarFotoUrl } from "@/lib/fotos";
-import { calcularMaxProducible } from "@/lib/inventario";
 import { LogoEmpresa } from "./logo-empresa";
 
 function formatoMoneda(valor: number) {
@@ -60,6 +59,7 @@ export default async function ResumenPage() {
       .select("id, nombre, cantidad, unidad")
       .eq("empresa_id", perfil.empresa_id)
       .eq("tipo", "producto")
+      .lte("cantidad", 0)
       .order("nombre"),
   ]);
 
@@ -96,43 +96,7 @@ export default async function ResumenPage() {
     .reduce((suma, p) => suma + (p.monto_total - p.monto_pagado), 0);
 
   // ---- Inventario agotado ----
-  // Un producto con receta (compuesto) no se define por su columna "cantidad" propia —
-  // lo disponible depende del insumo más escaso, mismo cálculo que usa la ficha de Inventario.
-  const items = (itemsData ?? []) as { id: string; nombre: string; cantidad: number; unidad: string }[];
-  const itemIds = items.map((item) => item.id);
-
-  type RecetaFila = {
-    item_resultante_id: string;
-    cantidad_insumo: number;
-    inventario_items: { cantidad: number } | null;
-  };
-
-  const { data: recetaRowsRaw } =
-    itemIds.length > 0
-      ? await supabase
-          .from("inventario_receta")
-          .select(
-            "item_resultante_id, cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( cantidad )",
-          )
-          .in("item_resultante_id", itemIds)
-      : { data: [] };
-
-  const recetaRows = (recetaRowsRaw ?? []) as unknown as RecetaFila[];
-
-  const recetaPorItem: Record<string, { cantidadInsumo: number; stockInsumo: number }[]> = {};
-  for (const fila of recetaRows) {
-    const lista = recetaPorItem[fila.item_resultante_id] ?? [];
-    lista.push({ cantidadInsumo: fila.cantidad_insumo, stockInsumo: fila.inventario_items?.cantidad ?? 0 });
-    recetaPorItem[fila.item_resultante_id] = lista;
-  }
-
-  const itemsAgotados = items
-    .map((item) => ({
-      ...item,
-      cantidad: calcularMaxProducible(recetaPorItem[item.id] ?? []) ?? item.cantidad,
-    }))
-    .filter((item) => item.cantidad <= 0)
-    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const itemsAgotados = (itemsData ?? []) as { id: string; nombre: string; cantidad: number; unidad: string }[];
 
   const logoUrl = await firmarFotoUrl(supabase, empresa?.logo_path ?? null, "empresas-logos");
 

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { calcularDiasRestantes, calcularMaxProducible } from "@/lib/inventario";
+import { calcularDiasRestantes } from "@/lib/inventario";
 import { NuevaVentaForm } from "./nueva-venta-form";
 
 export default async function NuevaVentaPage() {
@@ -39,45 +39,10 @@ export default async function NuevaVentaPage() {
     (velocidadData ?? []).map((v) => [v.item_id, Number(v.unidades_por_dia)]),
   );
 
-  // Productos con receta (compuestos): su "cantidad" propia no significa nada,
-  // lo que hay disponible depende del insumo más escaso — mismo cálculo que
-  // usa la ficha de Inventario.
-  const itemIds = (itemsData ?? []).map((item) => item.id);
-
-  type RecetaFila = {
-    item_resultante_id: string;
-    cantidad_insumo: number;
-    inventario_items: { cantidad: number } | null;
-  };
-
-  const { data: recetaRowsRaw } =
-    itemIds.length > 0
-      ? await supabase
-          .from("inventario_receta")
-          .select(
-            "item_resultante_id, cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( cantidad )",
-          )
-          .in("item_resultante_id", itemIds)
-      : { data: [] };
-
-  const recetaRows = (recetaRowsRaw ?? []) as unknown as RecetaFila[];
-
-  const recetaPorItem: Record<string, { cantidadInsumo: number; stockInsumo: number }[]> = {};
-  for (const fila of recetaRows) {
-    const lista = recetaPorItem[fila.item_resultante_id] ?? [];
-    lista.push({ cantidadInsumo: fila.cantidad_insumo, stockInsumo: fila.inventario_items?.cantidad ?? 0 });
-    recetaPorItem[fila.item_resultante_id] = lista;
-  }
-
-  const items = (itemsData ?? []).map((item) => {
-    const disponible = calcularMaxProducible(recetaPorItem[item.id] ?? []);
-    const cantidadEfectiva = disponible ?? item.cantidad;
-    return {
-      ...item,
-      cantidad: cantidadEfectiva,
-      diasRestantes: calcularDiasRestantes(cantidadEfectiva, velocidadPorItem.get(item.id)),
-    };
-  });
+  const items = (itemsData ?? []).map((item) => ({
+    ...item,
+    diasRestantes: calcularDiasRestantes(item.cantidad, velocidadPorItem.get(item.id)),
+  }));
 
   const { data: empresa } = await supabase
     .from("empresas")

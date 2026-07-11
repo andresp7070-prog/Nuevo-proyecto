@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { calcularMaxProducible, calcularDiasRestantes } from "@/lib/inventario";
+import { calcularDiasRestantes } from "@/lib/inventario";
 import { firmarFotoUrls } from "@/lib/fotos";
 import { DirectorioInventario } from "./directorio-inventario";
 
@@ -46,30 +46,15 @@ export default async function InventarioPage({
 
   const itemIds = (items ?? []).map((item) => item.id);
 
-  type RecetaFila = {
-    item_resultante_id: string;
-    cantidad_insumo: number;
-    inventario_items: { cantidad: number } | null;
-  };
-
-  const { data: recetaRowsRaw } =
+  const { data: recetaRows } =
     itemIds.length > 0
       ? await supabase
           .from("inventario_receta")
-          .select(
-            "item_resultante_id, cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( cantidad )",
-          )
+          .select("item_resultante_id")
           .in("item_resultante_id", itemIds)
       : { data: [] };
 
-  const recetaRows = (recetaRowsRaw ?? []) as unknown as RecetaFila[];
-
-  const recetaPorItem: Record<string, { cantidadInsumo: number; stockInsumo: number }[]> = {};
-  for (const fila of recetaRows) {
-    const lista = recetaPorItem[fila.item_resultante_id] ?? [];
-    lista.push({ cantidadInsumo: fila.cantidad_insumo, stockInsumo: fila.inventario_items?.cantidad ?? 0 });
-    recetaPorItem[fila.item_resultante_id] = lista;
-  }
+  const idsConReceta = new Set((recetaRows ?? []).map((r) => r.item_resultante_id));
 
   const { data: velocidadData } = await supabase
     .from("vista_velocidad_ventas")
@@ -80,16 +65,12 @@ export default async function InventarioPage({
     (velocidadData ?? []).map((v) => [v.item_id, Number(v.unidades_por_dia)]),
   );
 
-  const itemsConDisponible = (items ?? []).map((item) => {
-    const disponible = calcularMaxProducible(recetaPorItem[item.id] ?? []);
-    const cantidadEfectiva = disponible ?? item.cantidad;
-    return {
-      ...item,
-      disponible,
-      diasRestantes: calcularDiasRestantes(cantidadEfectiva, velocidadPorItem.get(item.id)),
-      fotoUrl: item.foto_path ? (fotoUrlsPorPath[item.foto_path] ?? null) : null,
-    };
-  });
+  const itemsConDisponible = (items ?? []).map((item) => ({
+    ...item,
+    tieneReceta: idsConReceta.has(item.id),
+    diasRestantes: calcularDiasRestantes(item.cantidad, velocidadPorItem.get(item.id)),
+    fotoUrl: item.foto_path ? (fotoUrlsPorPath[item.foto_path] ?? null) : null,
+  }));
 
   return <DirectorioInventario items={itemsConDisponible} creado={creado === "1"} />;
 }

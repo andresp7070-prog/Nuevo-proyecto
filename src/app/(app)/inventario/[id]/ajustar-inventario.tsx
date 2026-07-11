@@ -8,10 +8,12 @@ export function AjustarInventario({
   itemId,
   cantidadActual,
   unidad,
+  tieneReceta = false,
 }: {
   itemId: string;
   cantidadActual: number;
   unidad: string;
+  tieneReceta?: boolean;
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
@@ -74,6 +76,12 @@ export function AjustarInventario({
         onChange={(e) => setCantidadReal(e.target.value)}
         className="mb-2 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
       />
+      {tieneReceta && (
+        <p className="mb-2 text-xs text-gray-500">
+          Este producto tiene receta: si subes la cantidad (produjiste un lote), se descuentan
+          solos los insumos que usaste. Si la bajas (pérdida o daño), los insumos no se tocan.
+        </p>
+      )}
       <label className="mb-1 block text-xs font-medium text-gray-700">Motivo (opcional)</label>
       <input
         value={nota}

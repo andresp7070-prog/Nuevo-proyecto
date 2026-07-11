@@ -46,6 +46,17 @@ export async function crearProducto(input: {
 
   if (error) return { error: error.message };
 
+  // La cantidad inicial es su primer lote — así, si el costo cambia en la
+  // próxima compra, esta primera tanda se sigue vendiendo a su costo real.
+  if (input.cantidad > 0) {
+    const { error: errorLote } = await supabase.from("inventario_lotes").insert({
+      item_id: data.id,
+      cantidad_disponible: input.cantidad,
+      costo_unitario: input.costo,
+    });
+    if (errorLote) return { error: errorLote.message };
+  }
+
   return { error: null, id: data.id as string };
 }
 

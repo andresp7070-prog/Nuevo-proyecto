@@ -457,8 +457,9 @@ export function NuevoProductoForm({
 
   const campoCantidad = volverAReceta ? (
     <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-      Este producto no tiene una cantidad fija en stock — cuánto hay disponible se calcula
-      solo, según los insumos que le queden. Al venderlo, se descuentan automáticamente.
+      Este producto arranca en cero. Cuando produzcas un lote, entra a su ficha y usa
+      &ldquo;Ajustar cantidad&rdquo; para declarar cuántas unidades quedaron listas — eso
+      descuenta automáticamente los insumos que usaste.
     </div>
   ) : (
     <div>

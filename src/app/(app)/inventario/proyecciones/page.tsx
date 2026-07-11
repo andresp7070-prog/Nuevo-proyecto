@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { etiquetaUnidad } from "@/lib/unidades";
-import { calcularMaxProducible } from "@/lib/inventario";
 import { InventarioTabs } from "../inventario-tabs";
 
 type Item = {
@@ -12,12 +11,6 @@ type Item = {
   unidad: string;
   cantidad: number;
   tipo: string;
-};
-
-type RecetaFila = {
-  item_resultante_id: string;
-  cantidad_insumo: number;
-  inventario_items: { cantidad: number } | null;
 };
 
 type Velocidad = {
@@ -56,24 +49,6 @@ export default async function ProyeccionesInventarioPage() {
   const items = (itemsData ?? []) as Item[];
   const itemIds = items.map((item) => item.id);
 
-  const { data: recetaRowsRaw } =
-    itemIds.length > 0
-      ? await supabase
-          .from("inventario_receta")
-          .select(
-            "item_resultante_id, cantidad_insumo, inventario_items!inventario_receta_item_insumo_id_fkey ( cantidad )",
-          )
-          .in("item_resultante_id", itemIds)
-      : { data: [] };
-
-  const recetaRows = (recetaRowsRaw ?? []) as unknown as RecetaFila[];
-  const recetaPorItem: Record<string, { cantidadInsumo: number; stockInsumo: number }[]> = {};
-  for (const fila of recetaRows) {
-    const lista = recetaPorItem[fila.item_resultante_id] ?? [];
-    lista.push({ cantidadInsumo: fila.cantidad_insumo, stockInsumo: fila.inventario_items?.cantidad ?? 0 });
-    recetaPorItem[fila.item_resultante_id] = lista;
-  }
-
   const { data: velocidadData } =
     itemIds.length > 0
       ? await supabase
@@ -88,11 +63,9 @@ export default async function ProyeccionesInventarioPage() {
   );
 
   const filas = items.map((item) => {
-    const maxProducible = calcularMaxProducible(recetaPorItem[item.id] ?? []);
-    const disponible = maxProducible !== null ? maxProducible : item.cantidad;
     const velocidad = velocidadPorItem.get(item.id) ?? 0;
-    const diasRestantes = velocidad > 0 ? disponible / velocidad : null;
-    return { item, disponible, velocidad, diasRestantes };
+    const diasRestantes = velocidad > 0 ? item.cantidad / velocidad : null;
+    return { item, disponible: item.cantidad, velocidad, diasRestantes };
   });
 
   const conVentasRecientes = filas

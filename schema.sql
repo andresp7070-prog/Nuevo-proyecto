@@ -158,6 +158,64 @@ create table inventario_movimientos (
   nota text
 );
 
+-- Lotes de inventario: cada entrada de stock (compra, producción de un
+-- compuesto, carga inicial) guarda su propio costo y fecha por separado —
+-- así se puede consumir primero lo más antiguo (FIFO) y el costo que se
+-- congela en cada venta refleja lo que de verdad costó esa unidad, no el
+-- último precio de compra, aunque el costo haya cambiado entre compras.
+create table inventario_lotes (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid references inventario_items(id) not null,
+  cantidad_disponible numeric(12,2) not null,
+  costo_unitario numeric(12,2) not null,
+  fecha timestamptz not null default now()
+);
+
+-- Consume p_cantidad unidades de los lotes de un producto, del más antiguo al
+-- más nuevo (FIFO), y devuelve el costo unitario promedio ponderado de lo
+-- consumido. Si no hay suficiente en lotes (nunca se cargó uno, o quedó
+-- desfasado), el resto se completa al costo actual del producto, para no
+-- dejar la operación a medias.
+create or replace function consumir_lotes_fifo(p_item_id uuid, p_cantidad numeric)
+returns numeric
+language plpgsql
+as $$
+declare
+  v_lote record;
+  v_restante numeric := p_cantidad;
+  v_tomado numeric;
+  v_costo_total numeric := 0;
+  v_costo_actual numeric;
+begin
+  for v_lote in
+    select id, cantidad_disponible, costo_unitario
+    from inventario_lotes
+    where item_id = p_item_id and cantidad_disponible > 0
+    order by fecha asc
+    for update
+  loop
+    exit when v_restante <= 0;
+    v_tomado := least(v_restante, v_lote.cantidad_disponible);
+    update inventario_lotes
+    set cantidad_disponible = cantidad_disponible - v_tomado
+    where id = v_lote.id;
+    v_costo_total := v_costo_total + (v_tomado * v_lote.costo_unitario);
+    v_restante := v_restante - v_tomado;
+  end loop;
+
+  if v_restante > 0 then
+    select costo into v_costo_actual from inventario_items where id = p_item_id;
+    v_costo_total := v_costo_total + (v_restante * coalesce(v_costo_actual, 0));
+  end if;
+
+  if p_cantidad = 0 then
+    return coalesce((select costo from inventario_items where id = p_item_id), 0);
+  end if;
+
+  return v_costo_total / p_cantidad;
+end;
+$$;
+
 -- Detalle de cada venta: qué producto del inventario se vendió y cuánto.
 -- item_id queda vacío si el negocio no maneja inventario físico (ej. un servicio de peluquería).
 create table ventas_items (
@@ -175,46 +233,34 @@ create table ventas_items (
 -- cada vez que se registra un item vendido, se congela su costo actual (para reportes de
 -- utilidad futuros) y, si es un producto físico, se genera el movimiento de salida y se
 -- resta la cantidad disponible. Nadie tiene que ajustar el inventario a mano.
--- Si el producto vendido es compuesto (tiene receta en inventario_receta), no tiene stock
--- propio: en vez de descontarse a sí mismo, se descuentan sus insumos según la receta × la
--- cantidad vendida — la "producción" y la venta pasan a ser una sola operación automática.
+-- Un producto compuesto (con receta en inventario_receta) también tiene su propia cantidad
+-- en stock, igual que cualquier otro: sus insumos no se descuentan aquí al venderlo, sino
+-- antes, cuando se ajusta hacia arriba su cantidad para reflejar un lote ya producido
+-- (ver ajustar_inventario más abajo) — vender un producto compuesto solo descuenta su
+-- propio stock, exactamente como un producto sin receta.
 create or replace function descontar_inventario()
 returns trigger language plpgsql as $$
 declare
   v_tipo text;
   v_costo numeric(12,2);
-  v_receta record;
 begin
   if new.item_id is not null then
     select tipo, costo into v_tipo, v_costo from inventario_items where id = new.item_id;
-    new.costo_unitario := v_costo;
 
     if v_tipo = 'producto' then
-      if exists (select 1 from inventario_receta where item_resultante_id = new.item_id) then
-        for v_receta in
-          select item_insumo_id, cantidad_insumo
-          from inventario_receta
-          where item_resultante_id = new.item_id
-        loop
-          insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
-          values (
-            v_receta.item_insumo_id, 'salida', 'trasvase',
-            v_receta.cantidad_insumo * new.cantidad,
-            'Consumido al vender ' || new.cantidad || ' unidad(es) de un producto compuesto'
-          );
+      -- El costo congelado en la venta sale de los lotes consumidos (FIFO),
+      -- no del costo actual del producto — así el margen de esa venta no se
+      -- distorsiona si el costo cambió después de comprar lo que se vendió.
+      new.costo_unitario := consumir_lotes_fifo(new.item_id, new.cantidad);
 
-          update inventario_items
-          set cantidad = cantidad - (v_receta.cantidad_insumo * new.cantidad)
-          where id = v_receta.item_insumo_id;
-        end loop;
-      else
-        insert into inventario_movimientos (item_id, tipo, cantidad, nota)
-        values (new.item_id, 'salida', new.cantidad, 'Descuento automático por venta');
+      insert into inventario_movimientos (item_id, tipo, cantidad, nota)
+      values (new.item_id, 'salida', new.cantidad, 'Descuento automático por venta');
 
-        update inventario_items
-        set cantidad = cantidad - new.cantidad
-        where id = new.item_id;
-      end if;
+      update inventario_items
+      set cantidad = cantidad - new.cantidad
+      where id = new.item_id;
+    else
+      new.costo_unitario := v_costo;
     end if;
   end if;
   return new;
@@ -256,8 +302,9 @@ create or replace function reabastecer_producto(
   p_proveedor_id uuid default null
 )
 returns void
-language sql
+language plpgsql
 as $$
+begin
   update inventario_items
   set cantidad = cantidad + p_cantidad_agregada,
       costo = p_costo,
@@ -265,6 +312,14 @@ as $$
       categoria = p_categoria,
       proveedor_id = p_proveedor_id
   where id = p_item_id;
+
+  -- Cada compra es su propio lote, con su propio costo — por si el próximo
+  -- mes cambia el precio, para poder venderlos en el orden en que entraron.
+  if p_cantidad_agregada > 0 then
+    insert into inventario_lotes (item_id, cantidad_disponible, costo_unitario)
+    values (p_item_id, p_cantidad_agregada, p_costo);
+  end if;
+end;
 $$;
 
 -- Corrige la cantidad en stock a lo que de verdad hay — pérdida, daño, o un
@@ -281,9 +336,14 @@ language plpgsql
 as $$
 declare
   v_cantidad_actual numeric(12,2);
+  v_costo_actual numeric(12,2);
   v_diferencia numeric(12,2);
+  v_receta record;
+  v_costo_producido numeric(12,2);
+  v_costo_insumo numeric(12,2);
 begin
-  select cantidad into v_cantidad_actual from inventario_items where id = p_item_id;
+  select cantidad, costo into v_cantidad_actual, v_costo_actual
+  from inventario_items where id = p_item_id;
   if v_cantidad_actual is null then
     raise exception 'Producto no encontrado';
   end if;
@@ -303,6 +363,51 @@ begin
   );
 
   update inventario_items set cantidad = p_cantidad_real where id = p_item_id;
+
+  if v_diferencia > 0 then
+    if exists (select 1 from inventario_receta where item_resultante_id = p_item_id) then
+      -- Tiene receta: estas unidades de más se acaban de producir de verdad —
+      -- se descuentan los insumos usados (de sus propios lotes, FIFO) y el
+      -- costo del lote nuevo es lo que de verdad costaron esos insumos, no un
+      -- número puesto a mano. Un ajuste hacia abajo no toca los insumos: esas
+      -- unidades ya estaban producidas, solo se perdieron o se dañaron.
+      v_costo_producido := 0;
+      for v_receta in
+        select item_insumo_id, cantidad_insumo
+        from inventario_receta
+        where item_resultante_id = p_item_id
+      loop
+        v_costo_insumo := consumir_lotes_fifo(v_receta.item_insumo_id, v_receta.cantidad_insumo * v_diferencia);
+        v_costo_producido := v_costo_producido + (v_costo_insumo * v_receta.cantidad_insumo);
+
+        insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
+        values (
+          v_receta.item_insumo_id, 'salida', 'trasvase',
+          v_receta.cantidad_insumo * v_diferencia,
+          'Consumido al producir ' || v_diferencia || ' unidad(es) de un producto compuesto'
+        );
+
+        update inventario_items
+        set cantidad = cantidad - (v_receta.cantidad_insumo * v_diferencia)
+        where id = v_receta.item_insumo_id;
+      end loop;
+
+      insert into inventario_lotes (item_id, cantidad_disponible, costo_unitario)
+      values (p_item_id, v_diferencia, v_costo_producido);
+
+      update inventario_items set costo = v_costo_producido where id = p_item_id;
+    else
+      -- Sin receta: se encontró más stock del que el sistema pensaba. Se
+      -- registra como lote nuevo al costo actual del producto, que es el
+      -- único dato de costo disponible para esas unidades.
+      insert into inventario_lotes (item_id, cantidad_disponible, costo_unitario)
+      values (p_item_id, v_diferencia, coalesce(v_costo_actual, 0));
+    end if;
+  else
+    -- Ajuste hacia abajo (pérdida, daño, conteo): se descuenta de los lotes
+    -- existentes empezando por el más antiguo, para no perder la trazabilidad.
+    perform consumir_lotes_fifo(p_item_id, abs(v_diferencia));
+  end if;
 end;
 $$;
 
@@ -322,10 +427,16 @@ as $$
 declare
   v_item jsonb;
   v_existente_id uuid;
+  v_item_id uuid;
+  v_cantidad numeric;
+  v_costo numeric;
   v_creados int := 0;
 begin
   for v_item in select * from jsonb_array_elements(p_items)
   loop
+    v_cantidad := (v_item->>'cantidad')::numeric;
+    v_costo := (v_item->>'costo')::numeric;
+
     select id into v_existente_id
     from inventario_items
     where empresa_id = p_empresa_id and nombre = (v_item->>'nombre')
@@ -333,11 +444,12 @@ begin
 
     if v_existente_id is not null then
       update inventario_items
-      set cantidad = cantidad + (v_item->>'cantidad')::numeric,
-          costo = coalesce((v_item->>'costo')::numeric, costo),
+      set cantidad = cantidad + v_cantidad,
+          costo = coalesce(v_costo, costo),
           precio_venta = coalesce((v_item->>'precio_venta')::numeric, precio_venta),
           categoria = coalesce(nullif(v_item->>'categoria', ''), categoria)
       where id = v_existente_id;
+      v_item_id := v_existente_id;
     else
       insert into inventario_items (empresa_id, nombre, categoria, unidad, cantidad, costo, precio_venta)
       values (
@@ -345,11 +457,17 @@ begin
         v_item->>'nombre',
         nullif(v_item->>'categoria', ''),
         coalesce(nullif(v_item->>'unidad', ''), 'unidad'),
-        (v_item->>'cantidad')::numeric,
-        (v_item->>'costo')::numeric,
+        v_cantidad,
+        v_costo,
         (v_item->>'precio_venta')::numeric
-      );
+      )
+      returning id into v_item_id;
       v_creados := v_creados + 1;
+    end if;
+
+    if v_cantidad > 0 then
+      insert into inventario_lotes (item_id, cantidad_disponible, costo_unitario)
+      values (v_item_id, v_cantidad, coalesce(v_costo, 0));
     end if;
   end loop;
 
@@ -738,6 +856,7 @@ alter table crm_contactos enable row level security;
 alter table crm_interacciones enable row level security;
 alter table inventario_items enable row level security;
 alter table inventario_movimientos enable row level security;
+alter table inventario_lotes enable row level security;
 alter table inventario_receta enable row level security;
 alter table proveedores enable row level security;
 alter table finanzas_movimientos enable row level security;
@@ -814,6 +933,12 @@ create policy "ver interacciones de mi crm" on crm_interacciones
   );
 
 create policy "ver movimientos de mi inventario" on inventario_movimientos
+  for all using (
+    item_id in (select id from inventario_items where empresa_id = mi_empresa_id())
+    or es_admin()
+  );
+
+create policy "ver lotes de mi inventario" on inventario_lotes
   for all using (
     item_id in (select id from inventario_items where empresa_id = mi_empresa_id())
     or es_admin()

@@ -96,16 +96,9 @@ export default async function FichaProductoPage({
 
         <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
           <div>
-            <p className="text-gray-400">
-              {maxProducible !== null ? "Cantidad disponible" : "Cantidad en stock"}
-            </p>
-            <p
-              className={`font-medium ${
-                maxProducible !== null && maxProducible <= 0 ? "text-red-600" : "text-gray-900"
-              }`}
-            >
-              {maxProducible !== null ? maxProducible : item.cantidad}{" "}
-              {etiquetaUnidad(item.unidad)}
+            <p className="text-gray-400">Cantidad en stock</p>
+            <p className={`font-medium ${item.cantidad <= 0 ? "text-red-600" : "text-gray-900"}`}>
+              {item.cantidad} {etiquetaUnidad(item.unidad)}
             </p>
           </div>
           <div>
@@ -117,28 +110,27 @@ export default async function FichaProductoPage({
             <p className="font-medium text-gray-900">{formatoMoneda(item.precio_venta)}</p>
           </div>
         </div>
-        {maxProducible !== null ? (
+        {maxProducible !== null && (
           <p className="mt-2 text-xs text-gray-400">
-            Se calcula solo, según el insumo de la receta que menos tengas disponible — no es un
-            número que se guarde.
+            Con los insumos que tienes ahora, podrías producir hasta {maxProducible} más.
           </p>
-        ) : (
-          <div className="mt-4">
-            <AjustarInventario
-              itemId={item.id}
-              cantidadActual={item.cantidad}
-              unidad={etiquetaUnidad(item.unidad)}
-            />
-          </div>
         )}
+        <div className="mt-4">
+          <AjustarInventario
+            itemId={item.id}
+            cantidadActual={item.cantidad}
+            unidad={etiquetaUnidad(item.unidad)}
+            tieneReceta={receta.length > 0}
+          />
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 p-4">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">Receta</h2>
         {receta.length === 0 ? (
           <p className="text-sm text-gray-400">
-            Este producto no tiene receta configurada — no se descuenta ningún insumo al
-            venderlo.
+            Este producto no tiene receta configurada — ajustar su cantidad no descuenta ningún
+            insumo.
           </p>
         ) : (
           <ul className="divide-y divide-gray-200">
