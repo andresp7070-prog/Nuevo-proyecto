@@ -16,7 +16,7 @@ type Item = {
   costo: number | null;
   precio_venta: number | null;
   marca: string | null;
-  disponible: number | null;
+  tieneReceta: boolean;
   diasRestantes: number | null;
   fotoUrl: string | null;
 };
@@ -29,10 +29,6 @@ const opcionesOrden: { value: Orden; label: string }[] = [
   { value: "dias-asc", label: "Se acaba antes" },
   { value: "dias-desc", label: "Se acaba después" },
 ];
-
-function cantidadEfectiva(item: Item) {
-  return item.disponible ?? item.cantidad;
-}
 
 function formatoMoneda(valor: number | null) {
   if (valor === null) return "—";
@@ -60,8 +56,8 @@ export function DirectorioInventario({
       );
     })
     .sort((a, b) => {
-      if (orden === "cantidad-asc") return cantidadEfectiva(a) - cantidadEfectiva(b);
-      if (orden === "cantidad-desc") return cantidadEfectiva(b) - cantidadEfectiva(a);
+      if (orden === "cantidad-asc") return a.cantidad - b.cantidad;
+      if (orden === "cantidad-desc") return b.cantidad - a.cantidad;
       // Sin ventas suficientes para proyectar (null) siempre va al final, sin importar la dirección
       if (orden === "dias-asc") {
         if (a.diasRestantes === null) return 1;
@@ -75,11 +71,11 @@ export function DirectorioInventario({
 
   const filasCsv = filtrados.map((item) => ({
     nombre: item.nombre,
-    tipo_stock: item.disponible !== null ? "Receta" : "Normal",
+    tipo_stock: item.tieneReceta ? "Receta" : "Normal",
     categoria: item.categoria ?? "",
     marca: item.marca ?? "",
     unidad: etiquetaUnidad(item.unidad),
-    cantidad: cantidadEfectiva(item),
+    cantidad: item.cantidad,
     dias_restantes: item.diasRestantes ?? "",
     costo: item.costo ?? "",
     precio_venta: item.precio_venta ?? "",
@@ -166,7 +162,7 @@ export function DirectorioInventario({
                   <div>
                     <p className="flex items-center gap-2 text-sm font-medium text-gray-900">
                       {item.nombre}
-                      {item.disponible !== null && (
+                      {item.tieneReceta && (
                         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">
                           Receta
                         </span>
@@ -179,18 +175,13 @@ export function DirectorioInventario({
                 </div>
                 <div className="flex items-center gap-6 text-right text-sm">
                   <div>
-                    <p className="text-xs text-gray-400">
-                      {item.disponible !== null ? "Disponible" : "Cantidad"}
-                    </p>
+                    <p className="text-xs text-gray-400">Cantidad</p>
                     <p
                       className={`font-medium ${
-                        item.disponible !== null && item.disponible <= 0
-                          ? "text-red-600"
-                          : "text-gray-900"
+                        item.cantidad <= 0 ? "text-red-600" : "text-gray-900"
                       }`}
                     >
-                      {item.disponible !== null ? item.disponible : item.cantidad}{" "}
-                      {etiquetaUnidad(item.unidad)}
+                      {item.cantidad} {etiquetaUnidad(item.unidad)}
                     </p>
                   </div>
                   <div>

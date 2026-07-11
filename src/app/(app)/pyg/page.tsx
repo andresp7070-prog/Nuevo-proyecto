@@ -4,6 +4,7 @@ import Link from "next/link";
 import { primeraMayuscula } from "@/lib/texto";
 import { PygTabs } from "./pyg-tabs";
 import { DescargarCsv } from "@/components/descargar-csv";
+import { PagoRapidoDeuda } from "./pago-rapido-deuda";
 
 type FilaResultados = {
   mes: string;
@@ -239,19 +240,22 @@ export default async function PygPage({
           {pasivos.filter((p) => p.estado !== "pagado").length === 0 ? (
             <p className="text-sm text-gray-400">No tienes deudas pendientes registradas.</p>
           ) : (
-            <ul className="divide-y divide-gray-100 text-sm">
-              {pasivos
-                .filter((p) => p.estado !== "pagado")
-                .slice(0, 5)
-                .map((p) => (
-                  <li key={p.id} className="flex justify-between py-1.5">
-                    <span className="text-gray-700">{p.descripcion}</span>
-                    <span className="text-gray-900">
-                      {formatoMoneda(p.monto_total - p.monto_pagado)}
-                    </span>
-                  </li>
-                ))}
-            </ul>
+            <>
+              <ul className="divide-y divide-gray-100 text-sm">
+                {pasivos
+                  .filter((p) => p.estado !== "pagado")
+                  .slice(0, 5)
+                  .map((p) => (
+                    <li key={p.id} className="flex justify-between py-1.5">
+                      <span className="text-gray-700">{p.descripcion}</span>
+                      <span className="text-gray-900">
+                        {formatoMoneda(p.monto_total - p.monto_pagado)}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+              <PagoRapidoDeuda pasivos={pasivos.filter((p) => p.estado !== "pagado")} />
+            </>
           )}
         </div>
       </div>

@@ -31,13 +31,20 @@ export default async function NuevoProductoPage({
 
   const { data: items } = await supabase
     .from("inventario_items")
-    .select("id, nombre, categoria, cantidad, costo, precio_venta, unidad")
+    .select("id, nombre, categoria, cantidad, costo, precio_venta, unidad, proveedor_id")
+    .eq("empresa_id", perfil.empresa_id)
+    .order("nombre");
+
+  const { data: proveedores } = await supabase
+    .from("proveedores")
+    .select("id, nombre")
     .eq("empresa_id", perfil.empresa_id)
     .order("nombre");
 
   return (
     <NuevoProductoForm
       items={items ?? []}
+      proveedores={proveedores ?? []}
       nombreInicial={nombre ?? ""}
       volverAReceta={volver === "receta"}
     />

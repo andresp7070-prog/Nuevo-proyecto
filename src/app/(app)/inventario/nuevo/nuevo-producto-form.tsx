@@ -19,6 +19,12 @@ type ItemExistente = {
   costo: number | null;
   precio_venta: number | null;
   unidad: string;
+  proveedor_id: string | null;
+};
+
+type Proveedor = {
+  id: string;
+  nombre: string;
 };
 
 function filtrar(valores: string[], query: string) {
@@ -29,10 +35,12 @@ function filtrar(valores: string[], query: string) {
 
 export function NuevoProductoForm({
   items,
+  proveedores,
   nombreInicial = "",
   volverAReceta = false,
 }: {
   items: ItemExistente[];
+  proveedores: Proveedor[];
   nombreInicial?: string;
   volverAReceta?: boolean;
 }) {
@@ -53,6 +61,7 @@ export function NuevoProductoForm({
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
   const [precioVenta, setPrecioVenta] = useState("");
+  const [proveedorId, setProveedorId] = useState("");
   const [contenidoPorUnidad, setContenidoPorUnidad] = useState("");
   const [receta, setReceta] = useState<LineaRecetaValor[]>([]);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
@@ -111,6 +120,7 @@ export function NuevoProductoForm({
     setCategoria(item.categoria ?? "");
     setCosto(item.costo != null ? String(item.costo) : "");
     setPrecioVenta(item.precio_venta != null ? String(item.precio_venta) : "");
+    setProveedorId(item.proveedor_id ?? "");
     setCantidad("");
     setMostrarSugerenciasNombre(false);
   }
@@ -123,6 +133,7 @@ export function NuevoProductoForm({
     setCantidad("");
     setCosto("");
     setPrecioVenta("");
+    setProveedorId("");
     setContenidoPorUnidad("");
     setFotoFile(null);
     setErrorFoto(null);
@@ -183,6 +194,7 @@ export function NuevoProductoForm({
           cantidadAgregada: cantidadNum,
           costo: costoNum,
           precioVenta: precioVentaNum,
+          proveedorId: proveedorId || null,
         });
         if (resultado.error) {
           setError(resultado.error);
@@ -218,6 +230,7 @@ export function NuevoProductoForm({
           cantidad: cantidadNum,
           costo: costoNum,
           precioVenta: precioVentaNum,
+          proveedorId: proveedorId || null,
           atributos:
             volverAReceta && unidad !== "unidad" && contenidoPorUnidad.trim()
               ? { contenido_por_unidad: Number(contenidoPorUnidad) }
@@ -329,6 +342,39 @@ export function NuevoProductoForm({
     </div>
   );
 
+  const campoProveedor = (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <label className="block text-sm font-medium text-gray-700">Proveedor (opcional)</label>
+        <Link
+          href="/inventario/proveedores/nuevo"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-gray-500 hover:text-gray-700"
+        >
+          + Agregar proveedor
+        </Link>
+      </div>
+      <select
+        value={proveedorId}
+        onChange={(e) => setProveedorId(e.target.value)}
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+      >
+        <option value="">A quién se le compra este producto...</option>
+        {proveedores.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.nombre}
+          </option>
+        ))}
+      </select>
+      {proveedores.length === 0 && (
+        <p className="mt-1 text-xs text-gray-400">
+          Todavía no tienes proveedores — agrega uno con el enlace de arriba.
+        </p>
+      )}
+    </div>
+  );
+
   const campoFoto = (
     <div>
       <label className="mb-1 block text-sm font-medium text-gray-700">Foto (opcional)</label>
@@ -411,8 +457,9 @@ export function NuevoProductoForm({
 
   const campoCantidad = volverAReceta ? (
     <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-      Este producto no tiene una cantidad fija en stock — cuánto hay disponible se calcula
-      solo, según los insumos que le queden. Al venderlo, se descuentan automáticamente.
+      Este producto arranca en cero. Cuando produzcas un lote, entra a su ficha y usa
+      &ldquo;Ajustar cantidad&rdquo; para declarar cuántas unidades quedaron listas — eso
+      descuenta automáticamente los insumos que usaste.
     </div>
   ) : (
     <div>
@@ -527,6 +574,7 @@ export function NuevoProductoForm({
             {campoPrecioVenta}
             {campoNombre}
             {campoCategoria}
+            {campoProveedor}
             {campoUnidad}
             {campoContenido}
             {campoCantidad}
@@ -538,6 +586,7 @@ export function NuevoProductoForm({
         <div className="max-w-md space-y-4">
           {campoNombre}
           {campoCategoria}
+          {campoProveedor}
           {campoUnidad}
           {campoCantidad}
           {campoCosto}

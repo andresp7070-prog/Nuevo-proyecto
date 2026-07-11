@@ -9,6 +9,7 @@ export async function crearProducto(input: {
   cantidad: number;
   costo: number;
   precioVenta: number;
+  proveedorId?: string | null;
   atributos?: Record<string, unknown>;
 }): Promise<{ error: string | null; id?: string }> {
   const supabase = await createClient();
@@ -37,12 +38,24 @@ export async function crearProducto(input: {
       cantidad: input.cantidad,
       costo: input.costo,
       precio_venta: input.precioVenta,
+      proveedor_id: input.proveedorId ?? null,
       atributos: input.atributos ?? {},
     })
     .select("id")
     .single();
 
   if (error) return { error: error.message };
+
+  // La cantidad inicial es su primer lote — así, si el costo cambia en la
+  // próxima compra, esta primera tanda se sigue vendiendo a su costo real.
+  if (input.cantidad > 0) {
+    const { error: errorLote } = await supabase.from("inventario_lotes").insert({
+      item_id: data.id,
+      cantidad_disponible: input.cantidad,
+      costo_unitario: input.costo,
+    });
+    if (errorLote) return { error: errorLote.message };
+  }
 
   return { error: null, id: data.id as string };
 }
@@ -53,6 +66,7 @@ export async function reabastecerProducto(input: {
   cantidadAgregada: number;
   costo: number;
   precioVenta: number;
+  proveedorId?: string | null;
 }): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {
@@ -66,6 +80,7 @@ export async function reabastecerProducto(input: {
     p_costo: input.costo,
     p_precio_venta: input.precioVenta,
     p_categoria: input.categoria || null,
+    p_proveedor_id: input.proveedorId ?? null,
   });
 
   if (error) return { error: error.message };

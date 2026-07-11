@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { etiquetaUnidad } from "@/lib/unidades";
 import { calcularMaxProducible } from "@/lib/inventario";
+import { etiquetaFrecuenciaPago } from "@/lib/proveedores";
 import { firmarFotoUrl } from "@/lib/fotos";
 import { FotoProducto } from "./foto-producto";
 import { AjustarInventario } from "./ajustar-inventario";
@@ -33,12 +34,14 @@ export default async function FichaProductoPage({
   const { data: item } = await supabase
     .from("inventario_items")
     .select(
-      "id, nombre, categoria, unidad, cantidad, costo, precio_venta, foto_path, marca:atributos->>marca, contenido_por_unidad:atributos->>contenido_por_unidad",
+      "id, nombre, categoria, unidad, cantidad, costo, precio_venta, foto_path, marca:atributos->>marca, contenido_por_unidad:atributos->>contenido_por_unidad, proveedor:proveedores ( nombre, frecuencia_pago, dia_semana_pago, dias_personalizado )",
     )
     .eq("id", id)
     .single();
 
   if (!item) notFound();
+
+  const proveedor = Array.isArray(item.proveedor) ? item.proveedor[0] : item.proveedor;
 
   const fotoUrl = await firmarFotoUrl(supabase, item.foto_path);
 
@@ -74,6 +77,16 @@ export default async function FichaProductoPage({
                   Cada unidad: {item.contenido_por_unidad} {etiquetaUnidad(item.unidad)}
                 </p>
               )}
+              {proveedor && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Proveedor: {proveedor.nombre} ·{" "}
+                  {etiquetaFrecuenciaPago(
+                    proveedor.frecuencia_pago,
+                    proveedor.dia_semana_pago,
+                    proveedor.dias_personalizado,
+                  )}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
@@ -88,16 +101,9 @@ export default async function FichaProductoPage({
 
         <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
           <div>
-            <p className="text-gray-400">
-              {maxProducible !== null ? "Cantidad disponible" : "Cantidad en stock"}
-            </p>
-            <p
-              className={`font-medium ${
-                maxProducible !== null && maxProducible <= 0 ? "text-red-600" : "text-gray-900"
-              }`}
-            >
-              {maxProducible !== null ? maxProducible : item.cantidad}{" "}
-              {etiquetaUnidad(item.unidad)}
+            <p className="text-gray-400">Cantidad en stock</p>
+            <p className={`font-medium ${item.cantidad <= 0 ? "text-red-600" : "text-gray-900"}`}>
+              {item.cantidad} {etiquetaUnidad(item.unidad)}
             </p>
           </div>
           <div>
@@ -109,28 +115,27 @@ export default async function FichaProductoPage({
             <p className="font-medium text-gray-900">{formatoMoneda(item.precio_venta)}</p>
           </div>
         </div>
-        {maxProducible !== null ? (
+        {maxProducible !== null && (
           <p className="mt-2 text-xs text-gray-400">
-            Se calcula solo, según el insumo de la receta que menos tengas disponible — no es un
-            número que se guarde.
+            Con los insumos que tienes ahora, podrías producir hasta {maxProducible} más.
           </p>
-        ) : (
-          <div className="mt-4">
-            <AjustarInventario
-              itemId={item.id}
-              cantidadActual={item.cantidad}
-              unidad={etiquetaUnidad(item.unidad)}
-            />
-          </div>
         )}
+        <div className="mt-4">
+          <AjustarInventario
+            itemId={item.id}
+            cantidadActual={item.cantidad}
+            unidad={etiquetaUnidad(item.unidad)}
+            tieneReceta={receta.length > 0}
+          />
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 p-4">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">Receta</h2>
         {receta.length === 0 ? (
           <p className="text-sm text-gray-400">
-            Este producto no tiene receta configurada — no se descuenta ningún insumo al
-            venderlo.
+            Este producto no tiene receta configurada — ajustar su cantidad no descuenta ningún
+            insumo.
           </p>
         ) : (
           <ul className="divide-y divide-gray-200">

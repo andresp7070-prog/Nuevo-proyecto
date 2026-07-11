@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ahoraFecha, ahoraHora } from "@/lib/fecha";
 import { sinTildes } from "@/lib/texto";
 import { etiquetaUnidad } from "@/lib/unidades";
+import { EntradaMoneda } from "@/components/campo-moneda";
 import { buscarClientes, guardarVenta, type ClienteEncontrado } from "./actions";
 
 type ItemCatalogo = {
@@ -259,6 +261,23 @@ export function NuevaVentaForm({
       setError("Agrega al menos un producto con cantidad mayor a cero.");
       return;
     }
+
+    // No se puede vender más de lo que hay — suma todas las líneas del mismo
+    // producto (ej. la línea pagada + la gratis de un 2x1) contra el stock real.
+    const cantidadPorItem: Record<string, number> = {};
+    for (const linea of lineasValidas) {
+      cantidadPorItem[linea.itemId] = (cantidadPorItem[linea.itemId] ?? 0) + linea.cantidad;
+    }
+    for (const [itemId, cantidadPedida] of Object.entries(cantidadPorItem)) {
+      const item = items.find((i) => i.id === itemId);
+      if (item && cantidadPedida > item.cantidad) {
+        setError(
+          `No hay suficiente stock de "${item.nombre}": quedan ${item.cantidad}, intentas vender ${cantidadPedida}. Agrega inventario antes de vender.`,
+        );
+        return;
+      }
+    }
+
     if (crmActivo) {
       if (!nombre.trim()) {
         setError("El nombre del cliente es obligatorio.");
@@ -553,14 +572,12 @@ export function NuevaVentaForm({
                   <label className="mb-1 block text-xs font-medium text-gray-700">
                     Precio unitario
                   </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={linea.precioUnitario}
-                    onChange={(e) =>
-                      actualizarLinea(linea.key, { precioUnitario: Number(e.target.value) || 0 })
+                  <EntradaMoneda
+                    value={String(linea.precioUnitario)}
+                    onChange={(valor) =>
+                      actualizarLinea(linea.key, { precioUnitario: Number(valor) || 0 })
                     }
-                    className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 py-2 pl-6 pr-2 text-sm focus:border-gray-500 focus:outline-none"
                   />
                 </div>
                 <div className="col-span-1 flex justify-end">
@@ -579,6 +596,36 @@ export function NuevaVentaForm({
                 (() => {
                   const itemSeleccionado = items.find((i) => i.id === linea.itemId);
                   if (!itemSeleccionado) return null;
+
+                  if (itemSeleccionado.cantidad <= 0) {
+                    return (
+                      <div className="grid grid-cols-12 gap-2">
+                        <p className="col-span-6 text-xs font-medium text-red-600">
+                          Sin stock disponible — agrega inventario antes de vender este producto (
+                          <Link
+                            href={`/inventario/nuevo?nombre=${encodeURIComponent(itemSeleccionado.nombre)}`}
+                            className="underline"
+                          >
+                            agregar ahora
+                          </Link>
+                          ).
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const cantidadPedida = linea.cantidad === "" ? 0 : linea.cantidad;
+                  if (cantidadPedida > itemSeleccionado.cantidad) {
+                    return (
+                      <div className="grid grid-cols-12 gap-2">
+                        <p className="col-span-6 text-xs font-medium text-red-600">
+                          Solo quedan {itemSeleccionado.cantidad} {etiquetaUnidad(itemSeleccionado.unidad)}{" "}
+                          — no puedes vender {cantidadPedida}.
+                        </p>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="grid grid-cols-12 gap-2">
                       <p className="col-span-6 text-xs text-gray-500">

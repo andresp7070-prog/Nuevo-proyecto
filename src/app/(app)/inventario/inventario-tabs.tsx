@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const PESTANAS = [
   { href: "/inventario", etiqueta: "Productos" },
   { href: "/inventario/recetas", etiqueta: "Recetas" },
+  { href: "/inventario/proveedores", etiqueta: "Proveedores" },
   { href: "/inventario/proyecciones", etiqueta: "Proyecciones" },
   { href: "/inventario/importar", etiqueta: "Importar" },
 ];
