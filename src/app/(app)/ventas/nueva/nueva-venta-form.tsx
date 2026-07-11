@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ahoraFecha, ahoraHora } from "@/lib/fecha";
 import { sinTildes } from "@/lib/texto";
 import { etiquetaUnidad } from "@/lib/unidades";
@@ -260,6 +261,23 @@ export function NuevaVentaForm({
       setError("Agrega al menos un producto con cantidad mayor a cero.");
       return;
     }
+
+    // No se puede vender más de lo que hay — suma todas las líneas del mismo
+    // producto (ej. la línea pagada + la gratis de un 2x1) contra el stock real.
+    const cantidadPorItem: Record<string, number> = {};
+    for (const linea of lineasValidas) {
+      cantidadPorItem[linea.itemId] = (cantidadPorItem[linea.itemId] ?? 0) + linea.cantidad;
+    }
+    for (const [itemId, cantidadPedida] of Object.entries(cantidadPorItem)) {
+      const item = items.find((i) => i.id === itemId);
+      if (item && cantidadPedida > item.cantidad) {
+        setError(
+          `No hay suficiente stock de "${item.nombre}": quedan ${item.cantidad}, intentas vender ${cantidadPedida}. Agrega inventario antes de vender.`,
+        );
+        return;
+      }
+    }
+
     if (crmActivo) {
       if (!nombre.trim()) {
         setError("El nombre del cliente es obligatorio.");
@@ -578,6 +596,36 @@ export function NuevaVentaForm({
                 (() => {
                   const itemSeleccionado = items.find((i) => i.id === linea.itemId);
                   if (!itemSeleccionado) return null;
+
+                  if (itemSeleccionado.cantidad <= 0) {
+                    return (
+                      <div className="grid grid-cols-12 gap-2">
+                        <p className="col-span-6 text-xs font-medium text-red-600">
+                          Sin stock disponible — agrega inventario antes de vender este producto (
+                          <Link
+                            href={`/inventario/nuevo?nombre=${encodeURIComponent(itemSeleccionado.nombre)}`}
+                            className="underline"
+                          >
+                            agregar ahora
+                          </Link>
+                          ).
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const cantidadPedida = linea.cantidad === "" ? 0 : linea.cantidad;
+                  if (cantidadPedida > itemSeleccionado.cantidad) {
+                    return (
+                      <div className="grid grid-cols-12 gap-2">
+                        <p className="col-span-6 text-xs font-medium text-red-600">
+                          Solo quedan {itemSeleccionado.cantidad} {etiquetaUnidad(itemSeleccionado.unidad)}{" "}
+                          — no puedes vender {cantidadPedida}.
+                        </p>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="grid grid-cols-12 gap-2">
                       <p className="col-span-6 text-xs text-gray-500">

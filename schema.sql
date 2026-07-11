@@ -250,11 +250,21 @@ returns trigger language plpgsql as $$
 declare
   v_tipo text;
   v_costo numeric(12,2);
+  v_stock numeric(12,2);
+  v_nombre text;
 begin
   if new.item_id is not null then
-    select tipo, costo into v_tipo, v_costo from inventario_items where id = new.item_id;
+    select tipo, costo, cantidad, nombre into v_tipo, v_costo, v_stock, v_nombre
+    from inventario_items where id = new.item_id;
 
     if v_tipo = 'producto' then
+      -- No se puede vender más de lo que hay — obliga a mantener el inventario
+      -- al día en vez de dejar que la cantidad quede en negativo.
+      if v_stock < new.cantidad then
+        raise exception 'No hay suficiente stock de "%": quedan % y se intentó vender %. Agrega inventario antes de vender.',
+          v_nombre, v_stock, new.cantidad;
+      end if;
+
       -- El costo congelado en la venta sale de los lotes consumidos (FIFO),
       -- no del costo actual del producto — así el margen de esa venta no se
       -- distorsiona si el costo cambió después de comprar lo que se vendió.
