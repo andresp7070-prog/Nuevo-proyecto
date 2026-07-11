@@ -7,6 +7,12 @@ import { ahoraFecha } from "@/lib/fecha";
 import { CampoMoneda } from "@/components/campo-moneda";
 import { crearMovimiento } from "../actions";
 
+const frecuencias = [
+  { value: "diario", label: "Diario" },
+  { value: "mensual", label: "Mensual" },
+  { value: "anual", label: "Anual" },
+];
+
 export function NuevoMovimientoForm() {
   const router = useRouter();
 
@@ -15,6 +21,8 @@ export function NuevoMovimientoForm() {
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(ahoraFecha());
   const [nota, setNota] = useState("");
+  const [recurrente, setRecurrente] = useState(false);
+  const [frecuencia, setFrecuencia] = useState("mensual");
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +38,15 @@ export function NuevoMovimientoForm() {
 
     setGuardando(true);
     try {
-      const resultado = await crearMovimiento({ tipo, categoria: categoria.trim(), monto: montoNum, fecha, nota: nota.trim() });
+      const resultado = await crearMovimiento({
+        tipo,
+        categoria: categoria.trim(),
+        monto: montoNum,
+        fecha,
+        nota: nota.trim(),
+        recurrente: tipo === "gasto" ? recurrente : false,
+        frecuencia: tipo === "gasto" && recurrente ? frecuencia : "",
+      });
       if (resultado.error) {
         setError(resultado.error);
         return;
@@ -104,6 +120,40 @@ export function NuevoMovimientoForm() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
         </div>
+
+        {tipo === "gasto" && (
+          <div>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={recurrente}
+                onChange={(e) => setRecurrente(e.target.checked)}
+              />
+              Es un gasto que se repite (arriendo, nómina, servicios...)
+            </label>
+            {recurrente && (
+              <div className="mt-2">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Cada cuánto se repite
+                </label>
+                <select
+                  value={frecuencia}
+                  onChange={(e) => setFrecuencia(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+                >
+                  {frecuencias.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">
+                  Solo como referencia — el siguiente gasto lo sigues registrando tú cuando ocurra.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Nota (opcional)</label>

@@ -13,6 +13,14 @@ const tipos = [
   { value: "otro", label: "Otro" },
 ];
 
+const frecuencias = [
+  { value: "", label: "Sin definir" },
+  { value: "diario", label: "Diario" },
+  { value: "mensual", label: "Mensual" },
+  { value: "anual", label: "Anual" },
+  { value: "unico", label: "Pago único" },
+];
+
 export function NuevoPasivoForm() {
   const router = useRouter();
 
@@ -20,6 +28,7 @@ export function NuevoPasivoForm() {
   const [tipo, setTipo] = useState("prestamo");
   const [montoTotal, setMontoTotal] = useState("");
   const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [frecuenciaPago, setFrecuenciaPago] = useState("");
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +53,7 @@ export function NuevoPasivoForm() {
         tipo,
         montoTotal: montoNum,
         fechaVencimiento,
+        frecuenciaPago,
       });
       if (resultado.error) {
         setError(resultado.error);
@@ -110,6 +120,26 @@ export function NuevoPasivoForm() {
             onChange={(e) => setFechaVencimiento(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
           />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Cada cuánto se paga (opcional)
+          </label>
+          <select
+            value={frecuenciaPago}
+            onChange={(e) => setFrecuenciaPago(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          >
+            {frecuencias.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-400">
+            Solo como referencia — cada abono lo sigues registrando tú, esto no genera pagos solo.
+          </p>
         </div>
 
         <p className="text-xs text-gray-400">* Campos obligatorios</p>

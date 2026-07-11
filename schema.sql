@@ -289,6 +289,57 @@ begin
 end;
 $$;
 
+-- Carga masiva de inventario inicial: para una empresa que llega con su propio
+-- catálogo (de otra herramienta o de una hoja de Excel a mano). Por cada fila
+-- del CSV, si el producto ya existe (mismo nombre en la empresa) le suma la
+-- cantidad y actualiza costo/precio/categoría — igual que reabastecer_producto();
+-- si no existe, lo crea. Es una foto de "cuánto hay hoy", no un historial de
+-- movimientos. Devuelve cuántos productos nuevos creó.
+create or replace function cargar_inventario_inicial(
+  p_empresa_id uuid,
+  p_items jsonb  -- [{"nombre":"...","categoria":"...","unidad":"unidad","cantidad":10,"costo":1000,"precio_venta":2000}, ...]
+)
+returns int
+language plpgsql
+as $$
+declare
+  v_item jsonb;
+  v_existente_id uuid;
+  v_creados int := 0;
+begin
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    select id into v_existente_id
+    from inventario_items
+    where empresa_id = p_empresa_id and nombre = (v_item->>'nombre')
+    limit 1;
+
+    if v_existente_id is not null then
+      update inventario_items
+      set cantidad = cantidad + (v_item->>'cantidad')::numeric,
+          costo = coalesce((v_item->>'costo')::numeric, costo),
+          precio_venta = coalesce((v_item->>'precio_venta')::numeric, precio_venta),
+          categoria = coalesce(nullif(v_item->>'categoria', ''), categoria)
+      where id = v_existente_id;
+    else
+      insert into inventario_items (empresa_id, nombre, categoria, unidad, cantidad, costo, precio_venta)
+      values (
+        p_empresa_id,
+        v_item->>'nombre',
+        nullif(v_item->>'categoria', ''),
+        coalesce(nullif(v_item->>'unidad', ''), 'unidad'),
+        (v_item->>'cantidad')::numeric,
+        (v_item->>'costo')::numeric,
+        (v_item->>'precio_venta')::numeric
+      );
+      v_creados := v_creados + 1;
+    end if;
+  end loop;
+
+  return v_creados;
+end;
+$$;
+
 -- ------------------------------------------------------------
 -- 9. FINANZAS — alimenta el estado de pérdidas y ganancias
 -- ------------------------------------------------------------
@@ -392,6 +443,9 @@ create table pasivos (
   monto_pagado numeric(12,2) not null default 0,
   fecha_vencimiento date,
   estado text not null default 'pendiente' check (estado in ('pendiente','pagado','vencido')),
+  -- Cada cuánto se planea pagar (informativo — no genera abonos solo, cada
+  -- pago se sigue registrando a mano con registrarAbono()/marcarPagado()).
+  frecuencia_pago text check (frecuencia_pago is null or frecuencia_pago in ('diario','mensual','anual','unico')),
   created_at timestamptz default now()
 );
 
@@ -399,6 +453,13 @@ create table pasivos (
 -- categoría 'pago de deuda') con la deuda a la que corresponde. Nulo
 -- para cualquier otro gasto o ingreso que no sea un pago de deuda.
 alter table finanzas_movimientos add column pasivo_id uuid references pasivos(id);
+
+-- Si un gasto se repite (arriendo, nómina, servicios), queda marcado como
+-- referencia — informativo, no genera el siguiente gasto solo: cada uno se
+-- sigue registrando a mano cuando ocurre de verdad (criterio de caja).
+alter table finanzas_movimientos add column recurrente boolean not null default false;
+alter table finanzas_movimientos add column frecuencia text
+  check (frecuencia is null or frecuencia in ('diario','mensual','anual'));
 
 -- ------------------------------------------------------------
 -- Vista: Utilidad por producto y por categoría

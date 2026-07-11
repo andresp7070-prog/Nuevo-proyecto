@@ -14,6 +14,7 @@ type Pasivo = {
   monto_pagado: number;
   fecha_vencimiento: string | null;
   estado: string;
+  frecuencia_pago: string | null;
 };
 
 type Pago = { monto: number; fecha: string };
@@ -23,6 +24,13 @@ const etiquetaTipo: Record<string, string> = {
   proveedor: "Proveedor",
   tarjeta_credito: "Tarjeta de crédito",
   otro: "Otro",
+};
+
+const etiquetaFrecuencia: Record<string, string> = {
+  diario: "Diario",
+  mensual: "Mensual",
+  anual: "Anual",
+  unico: "Pago único",
 };
 
 function formatoMoneda(valor: number) {
@@ -80,7 +88,11 @@ function FilaPasivo({ pasivo, pagos }: { pasivo: Pasivo; pagos: Pago[] }) {
         <div>
           <p className="text-sm font-medium text-gray-900">{pasivo.descripcion}</p>
           <p className="text-xs text-gray-400">
-            {[pasivo.tipo ? etiquetaTipo[pasivo.tipo] ?? pasivo.tipo : null, pasivo.fecha_vencimiento ? `Vence ${pasivo.fecha_vencimiento}` : null]
+            {[
+              pasivo.tipo ? etiquetaTipo[pasivo.tipo] ?? pasivo.tipo : null,
+              pasivo.fecha_vencimiento ? `Vence ${pasivo.fecha_vencimiento}` : null,
+              pasivo.frecuencia_pago ? etiquetaFrecuencia[pasivo.frecuencia_pago] ?? pasivo.frecuencia_pago : null,
+            ]
               .filter(Boolean)
               .join(" · ")}
           </p>

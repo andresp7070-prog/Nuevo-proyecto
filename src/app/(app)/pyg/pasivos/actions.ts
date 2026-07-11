@@ -7,6 +7,7 @@ export async function crearPasivo(input: {
   tipo: string;
   montoTotal: number;
   fechaVencimiento: string;
+  frecuenciaPago: string;
 }): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {
@@ -30,6 +31,7 @@ export async function crearPasivo(input: {
     tipo: input.tipo || null,
     monto_total: input.montoTotal,
     fecha_vencimiento: input.fechaVencimiento || null,
+    frecuencia_pago: input.frecuenciaPago || null,
   });
 
   if (error) return { error: error.message };
