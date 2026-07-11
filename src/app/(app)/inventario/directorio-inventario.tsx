@@ -75,6 +75,7 @@ export function DirectorioInventario({
 
   const filasCsv = filtrados.map((item) => ({
     nombre: item.nombre,
+    tipo_stock: item.disponible !== null ? "Receta" : "Normal",
     categoria: item.categoria ?? "",
     marca: item.marca ?? "",
     unidad: etiquetaUnidad(item.unidad),
@@ -95,6 +96,7 @@ export function DirectorioInventario({
             filas={filasCsv}
             columnas={[
               { clave: "nombre", titulo: "Nombre" },
+              { clave: "tipo_stock", titulo: "Tipo de stock" },
               { clave: "categoria", titulo: "Categoría" },
               { clave: "marca", titulo: "Marca" },
               { clave: "unidad", titulo: "Unidad" },
@@ -162,7 +164,14 @@ export function DirectorioInventario({
                     <div className="h-10 w-10 shrink-0 rounded-lg border border-dashed border-gray-200" />
                   )}
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{item.nombre}</p>
+                    <p className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                      {item.nombre}
+                      {item.disponible !== null && (
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">
+                          Receta
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-gray-400">
                       {[item.categoria, item.marca].filter(Boolean).join(" · ") || "Sin categoría"}
                     </p>

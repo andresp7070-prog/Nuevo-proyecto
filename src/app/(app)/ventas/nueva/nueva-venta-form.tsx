@@ -80,6 +80,13 @@ function cantidadDesdeInput(valorCrudo: string): number | "" {
   return Number(soloDigitos);
 }
 
+// 2x1: de cada 2 unidades que ya están en la línea, 1 es gratis — se calcula
+// solo a partir de la cantidad escrita, sin agregar unidades manuales aparte.
+function desglose2x1(cantidad: number): { pagadas: number; gratis: number } {
+  const gratis = Math.floor(cantidad / 2);
+  return { pagadas: cantidad - gratis, gratis };
+}
+
 function filtrarItems(items: ItemCatalogo[], query: string) {
   const q = sinTildes(query.trim());
   if (!q) return [];
@@ -211,23 +218,6 @@ export function NuevaVentaForm({
     }
   }
 
-  function agregarUnidadGratis(linea: LineaVenta, promo: Promocion) {
-    setLineas((actual) => [
-      ...actual,
-      {
-        key: crypto.randomUUID(),
-        itemId: linea.itemId,
-        busquedaProducto: linea.busquedaProducto,
-        mostrarSugerenciasProducto: false,
-        cantidad: 1,
-        precioUnitario: 0,
-        precioOriginal: linea.precioOriginal,
-        promocionId: promo.id,
-        esGratis: true,
-      },
-    ]);
-  }
-
   function agregarRegalo(promo: Promocion) {
     if (!promo.itemRegaloId) return;
     setLineas((actual) => [
@@ -246,10 +236,16 @@ export function NuevaVentaForm({
     ]);
   }
 
-  const total = lineas.reduce(
-    (suma, linea) => suma + (linea.cantidad === "" ? 0 : linea.cantidad) * linea.precioUnitario,
-    0,
-  );
+  const total = lineas.reduce((suma, linea) => {
+    const cantidadNum = linea.cantidad === "" ? 0 : linea.cantidad;
+    if (!linea.esGratis) {
+      const promo = promociones.find((p) => p.id === linea.promocionId) ?? null;
+      if (promo?.tipoPromocion === "2x1") {
+        return suma + desglose2x1(cantidadNum).pagadas * linea.precioUnitario;
+      }
+    }
+    return suma + cantidadNum * linea.precioUnitario;
+  }, 0);
 
   async function guardar() {
     setError(null);
@@ -292,31 +288,64 @@ export function NuevaVentaForm({
         clienteEmail: email.trim(),
         fecha: fechaHora,
         metodoPago,
-        items: lineasValidas.map((linea) => {
+        items: lineasValidas.flatMap((linea) => {
           if (linea.esGratis) {
-            return {
+            return [
+              {
+                itemId: linea.itemId,
+                cantidad: linea.cantidad,
+                precioUnitario: linea.precioUnitario,
+                promocionId: linea.promocionId,
+                descuentoAplicado: linea.precioOriginal * linea.cantidad,
+              },
+            ];
+          }
+
+          const promo = promociones.find((p) => p.id === linea.promocionId) ?? null;
+
+          // 2x1: la línea que la persona llenó se reparte sola en lo pagado y lo
+          // gratis (de cada 2 unidades, 1 sin costo) — no depende de que se haya
+          // agregado ninguna unidad extra a mano.
+          if (promo?.tipoPromocion === "2x1") {
+            const { pagadas, gratis } = desglose2x1(linea.cantidad);
+            const filas = [];
+            if (pagadas > 0) {
+              filas.push({
+                itemId: linea.itemId,
+                cantidad: pagadas,
+                precioUnitario: linea.precioUnitario,
+                promocionId: null,
+                descuentoAplicado: 0,
+              });
+            }
+            if (gratis > 0) {
+              filas.push({
+                itemId: linea.itemId,
+                cantidad: gratis,
+                precioUnitario: 0,
+                promocionId: promo.id,
+                descuentoAplicado: linea.precioOriginal * gratis,
+              });
+            }
+            return filas;
+          }
+
+          // Para "lleve X gratis", esta línea se paga a precio normal — la promoción
+          // ya queda registrada por la línea gratis del regalo. Marcarla aquí también
+          // inflaría el conteo de "unidades con descuento" en el desempeño de la promoción.
+          const esDescuentoDirecto =
+            promo?.tipoPromocion === "descuento_porcentaje" || promo?.tipoPromocion === "descuento_fijo";
+          return [
+            {
               itemId: linea.itemId,
               cantidad: linea.cantidad,
               precioUnitario: linea.precioUnitario,
-              promocionId: linea.promocionId,
-              descuentoAplicado: linea.precioOriginal * linea.cantidad,
-            };
-          }
-          // Para 2x1 y "lleve X gratis", esta línea se paga a precio normal — la promoción
-          // ya queda registrada por la línea gratis. Marcarla aquí también inflaría el
-          // conteo de "unidades con descuento" en el desempeño de la promoción.
-          const promo = promociones.find((p) => p.id === linea.promocionId) ?? null;
-          const esDescuentoDirecto =
-            promo?.tipoPromocion === "descuento_porcentaje" || promo?.tipoPromocion === "descuento_fijo";
-          return {
-            itemId: linea.itemId,
-            cantidad: linea.cantidad,
-            precioUnitario: linea.precioUnitario,
-            promocionId: esDescuentoDirecto ? linea.promocionId : null,
-            descuentoAplicado: esDescuentoDirecto
-              ? Math.max(0, linea.precioOriginal - linea.precioUnitario) * linea.cantidad
-              : 0,
-          };
+              promocionId: esDescuentoDirecto ? linea.promocionId : null,
+              descuentoAplicado: esDescuentoDirecto
+                ? Math.max(0, linea.precioOriginal - linea.precioUnitario) * linea.cantidad
+                : 0,
+            },
+          ];
         }),
       });
       if (resultado.error) {
@@ -596,15 +625,19 @@ export function NuevaVentaForm({
                     ))}
                   </select>
 
-                  {promoSeleccionada?.tipoPromocion === "2x1" && (
-                    <button
-                      type="button"
-                      onClick={() => agregarUnidadGratis(linea, promoSeleccionada)}
-                      className="rounded-lg border border-green-300 px-2 py-1 text-xs text-green-700 hover:bg-green-50"
-                    >
-                      + Unidad gratis (2x1)
-                    </button>
-                  )}
+                  {promoSeleccionada?.tipoPromocion === "2x1" &&
+                    (() => {
+                      const { pagadas, gratis } = desglose2x1(
+                        linea.cantidad === "" ? 0 : linea.cantidad,
+                      );
+                      return (
+                        <span className="text-xs text-green-700">
+                          {gratis > 0
+                            ? `De estas ${pagadas + gratis}, pagas ${pagadas} y ${gratis} son gratis (2x1)`
+                            : "Agrega al menos 2 unidades para que aplique el 2x1"}
+                        </span>
+                      );
+                    })()}
                   {promoSeleccionada?.tipoPromocion === "lleve_x_gratis" && (
                     <button
                       type="button"

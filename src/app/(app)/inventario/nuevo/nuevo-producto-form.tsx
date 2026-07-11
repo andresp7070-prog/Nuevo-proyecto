@@ -67,10 +67,14 @@ export function NuevoProductoForm({
     return total + linea.cantidad * (insumo?.costo ?? 0);
   }, 0);
 
+  // Fuera del flujo de receta, el costo no se calcula solo — es el que la persona escribió.
+  const costoEfectivo = volverAReceta ? costoCalculado : Number(costo) || 0;
   const precioVentaEstimado = Number(precioVenta) || 0;
-  const gananciaUnitaria = precioVentaEstimado - costoCalculado;
+  const gananciaUnitaria = precioVentaEstimado - costoEfectivo;
   const margenPorcentaje =
     precioVentaEstimado > 0 ? (gananciaUnitaria / precioVentaEstimado) * 100 : null;
+  const mostrarMargen =
+    margenPorcentaje !== null && (volverAReceta || costo.trim() !== "");
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -461,10 +465,10 @@ export function NuevoProductoForm({
         value={precioVenta}
         onChange={setPrecioVenta}
       />
-      {volverAReceta && margenPorcentaje !== null && (
+      {mostrarMargen && (
         <p className={`mt-1 text-xs ${gananciaUnitaria >= 0 ? "text-green-600" : "text-red-600"}`}>
           Ganancia: {gananciaUnitaria.toLocaleString("es-CO", { style: "currency", currency: "COP" })}{" "}
-          por unidad ({margenPorcentaje.toFixed(1)}% de margen)
+          por unidad ({margenPorcentaje!.toFixed(1)}% de margen)
         </p>
       )}
     </div>
