@@ -78,7 +78,7 @@ export function Sidebar({ modulosActivos }: { modulosActivos: string[] }) {
 
       <div className="flex items-center gap-2 px-3 text-xs text-gray-400">
         <LogoCompass className="h-4 w-4" />
-        <span>Desarrollado por Asesorías</span>
+        <span>Desarrollado por Datum</span>
       </div>
     </nav>
   );
