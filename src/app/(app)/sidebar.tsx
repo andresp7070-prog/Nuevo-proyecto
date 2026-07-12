@@ -44,7 +44,7 @@ export function Sidebar({ modulosActivos }: { modulosActivos: string[] }) {
       <div>
         <div className="mb-4 flex items-center gap-2 px-3 text-accent">
           <LogoCompass className="h-6 w-6" />
-          <span className="font-serif text-lg font-semibold text-gray-900">Datum</span>
+          <span className="text-lg font-bold tracking-tight text-gray-900">Datum</span>
         </div>
         <ul className="space-y-1">
           {modulos.map((modulo) => {

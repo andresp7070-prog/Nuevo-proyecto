@@ -8,11 +8,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-hanken-grotesk);
   --font-mono: var(--font-geist-mono);
 
   /* Paleta de marca Datum: negro para texto, #1A1B33 para botones/brújula,
-     #9C6900 para indicadores y datos destacados, #33311A para gráficas. */
+     #9C6900 para indicadores y datos destacados, #1A1B33 para gráficas. */
   --color-gray-50: #fafafa;
   --color-gray-100: #f2f2f2;
   --color-gray-200: #e7e7e7;
@@ -51,5 +51,5 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
