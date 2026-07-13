@@ -8,16 +8,40 @@ import { normalizarUnidad, etiquetaUnidad } from "@/lib/unidades";
 import { DescargarCsv } from "@/components/descargar-csv";
 import { cargarInventarioInicial, type FilaImportacion } from "./actions";
 
-const COLUMNAS_ESPERADAS = ["nombre", "categoria", "unidad", "cantidad", "costo", "precio_venta"];
+const COLUMNAS_ESPERADAS = [
+  "nombre",
+  "categoria",
+  "unidad",
+  "cantidad",
+  "costo",
+  "precio_venta",
+  "es_insumo",
+];
+
+const VALORES_SI = ["si", "s", "sí", "yes", "y", "x", "1", "true"];
+const VALORES_NO = ["no", "n", "0", "false"];
 
 type FilaPreview = FilaImportacion & {
   unidadOriginal: string;
   unidadReconocida: boolean;
+  esInsumoOriginal: string;
+  esInsumoReconocido: boolean;
   errores: string[];
 };
 
 function normalizarEncabezado(valor: string) {
   return sinTildes(valor.trim());
+}
+
+// "es_insumo" viene como texto libre (si/no) en el CSV — reconoce las formas
+// comunes de escribirlo; si no reconoce nada, asume que no es insumo pero lo
+// marca como error para que la persona lo revise en la vista previa.
+function normalizarSiNo(textoLibre: string): { valor: boolean; reconocida: boolean } {
+  const limpio = sinTildes(textoLibre.trim());
+  if (!limpio) return { valor: false, reconocida: true };
+  if (VALORES_SI.includes(limpio)) return { valor: true, reconocida: true };
+  if (VALORES_NO.includes(limpio)) return { valor: false, reconocida: true };
+  return { valor: false, reconocida: false };
 }
 
 export function ImportarInventarioForm() {
@@ -79,6 +103,8 @@ export function ImportarInventarioForm() {
         const cantidadCruda = (fila[indice.cantidad] ?? "").trim();
         const costoCrudo = (fila[indice.costo] ?? "").trim();
         const precioCrudo = (fila[indice.precio_venta] ?? "").trim();
+        const esInsumoOriginal = (fila[indice.es_insumo] ?? "").trim();
+        const { valor: esInsumo, reconocida: esInsumoReconocido } = normalizarSiNo(esInsumoOriginal);
 
         const errores: string[] = [];
         if (!nombre) errores.push("Falta el nombre del producto");
@@ -94,6 +120,12 @@ export function ImportarInventarioForm() {
         if (precioCrudo && Number.isNaN(Number(precioCrudo))) {
           errores.push(`Precio de venta "${precioCrudo}" no es un número válido, se guarda como 0`);
         }
+        if (!esInsumoReconocido) {
+          errores.push(`"es_insumo" con valor "${esInsumoOriginal}" no reconocido, se guarda como No`);
+        }
+        if (esInsumo && precioCrudo && Number(precioCrudo) > 0) {
+          errores.push(`Tiene precio de venta pero está marcado como insumo — se guarda sin precio de venta`);
+        }
 
         return {
           nombre,
@@ -104,6 +136,9 @@ export function ImportarInventarioForm() {
           cantidad: Number(cantidadCruda) || 0,
           costo: Number(costoCrudo) || 0,
           precioVenta: Number(precioCrudo) || 0,
+          esInsumo,
+          esInsumoOriginal,
+          esInsumoReconocido,
           errores,
         };
       });
@@ -157,6 +192,7 @@ export function ImportarInventarioForm() {
               cantidad: 50,
               costo: 3500,
               precio_venta: 6000,
+              es_insumo: "no",
             },
           ]}
           columnas={[
@@ -166,6 +202,7 @@ export function ImportarInventarioForm() {
             { clave: "cantidad", titulo: "cantidad" },
             { clave: "costo", titulo: "costo" },
             { clave: "precio_venta", titulo: "precio_venta" },
+            { clave: "es_insumo", titulo: "es_insumo" },
           ]}
           nombreArchivo="plantilla-inventario.csv"
         />
@@ -184,10 +221,15 @@ export function ImportarInventarioForm() {
           3. Si un producto ya existe (mismo nombre), le suma la cantidad y actualiza costo y
           precio; si no existe, lo crea.
         </p>
-        <p>
+        <p className="mb-1">
           En &quot;unidad&quot; puedes escribir como te salga natural — <em>kg, kilo, litro, lt, ml, libra,
           galón, unidad</em> — el sistema reconoce las formas comunes (con o sin tilde, mayúscula
           o minúscula). Si algo no lo reconoce, te avisa en la vista previa antes de confirmar.
+        </p>
+        <p>
+          &quot;es_insumo&quot; es <em>si</em> o <em>no</em>: los insumos son materiales de receta que no
+          se venden solos (no tienen precio de venta) — si marcas &quot;si&quot; y además le pones
+          precio de venta, la vista previa lo marca como error porque no tiene lógica.
         </p>
       </div>
 
@@ -225,6 +267,7 @@ export function ImportarInventarioForm() {
                   cantidad: fila.cantidad,
                   costo: fila.costo,
                   precio_venta: fila.precioVenta,
+                  es_insumo: fila.esInsumoOriginal || (fila.esInsumo ? "si" : "no"),
                   error: fila.errores.join(" / "),
                 }))}
                 columnas={[
@@ -234,6 +277,7 @@ export function ImportarInventarioForm() {
                   { clave: "cantidad", titulo: "cantidad" },
                   { clave: "costo", titulo: "costo" },
                   { clave: "precio_venta", titulo: "precio_venta" },
+                  { clave: "es_insumo", titulo: "es_insumo" },
                   { clave: "error", titulo: "error" },
                 ]}
                 nombreArchivo="inventario-con-errores.csv"
@@ -259,6 +303,7 @@ export function ImportarInventarioForm() {
                   <th className="px-3 py-2">Cantidad</th>
                   <th className="px-3 py-2">Costo</th>
                   <th className="px-3 py-2">Precio venta</th>
+                  <th className="px-3 py-2">Insumo</th>
                   <th className="px-3 py-2">Error</th>
                 </tr>
               </thead>
@@ -270,7 +315,10 @@ export function ImportarInventarioForm() {
                     <td className="px-3 py-2 text-gray-500">{etiquetaUnidad(fila.unidad)}</td>
                     <td className="px-3 py-2 text-gray-500">{fila.cantidad}</td>
                     <td className="px-3 py-2 text-gray-500">{fila.costo}</td>
-                    <td className="px-3 py-2 text-gray-500">{fila.precioVenta}</td>
+                    <td className="px-3 py-2 text-gray-500">
+                      {fila.esInsumo ? "—" : fila.precioVenta}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">{fila.esInsumo ? "Sí" : "No"}</td>
                     <td className="px-3 py-2 text-amber-600">
                       {fila.errores.length > 0 ? fila.errores.join(" / ") : "—"}
                     </td>

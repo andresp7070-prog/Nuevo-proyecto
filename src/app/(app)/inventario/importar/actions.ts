@@ -9,6 +9,7 @@ export type FilaImportacion = {
   cantidad: number;
   costo: number;
   precioVenta: number;
+  esInsumo: boolean;
 };
 
 export async function cargarInventarioInicial(
@@ -39,6 +40,7 @@ export async function cargarInventarioInicial(
       cantidad: f.cantidad,
       costo: f.costo,
       precio_venta: f.precioVenta,
+      es_insumo: f.esInsumo,
     })),
   });
 

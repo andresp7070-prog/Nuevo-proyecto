@@ -451,7 +451,7 @@ $$;
 -- movimientos. Devuelve cuántos productos nuevos creó.
 create or replace function cargar_inventario_inicial(
   p_empresa_id uuid,
-  p_items jsonb  -- [{"nombre":"...","categoria":"...","unidad":"unidad","cantidad":10,"costo":1000,"precio_venta":2000}, ...]
+  p_items jsonb  -- [{"nombre":"...","categoria":"...","unidad":"unidad","cantidad":10,"costo":1000,"precio_venta":2000,"es_insumo":false}, ...]
 )
 returns int
 language plpgsql
@@ -462,12 +462,17 @@ declare
   v_item_id uuid;
   v_cantidad numeric;
   v_costo numeric;
+  v_es_insumo boolean;
+  v_precio_venta numeric;
   v_creados int := 0;
 begin
   for v_item in select * from jsonb_array_elements(p_items)
   loop
     v_cantidad := (v_item->>'cantidad')::numeric;
     v_costo := (v_item->>'costo')::numeric;
+    v_es_insumo := coalesce((v_item->>'es_insumo')::boolean, false);
+    -- un insumo puro no se vende individualmente, así que nunca tiene precio de venta
+    v_precio_venta := case when v_es_insumo then null else (v_item->>'precio_venta')::numeric end;
 
     select id into v_existente_id
     from inventario_items
@@ -478,12 +483,13 @@ begin
       update inventario_items
       set cantidad = cantidad + v_cantidad,
           costo = coalesce(v_costo, costo),
-          precio_venta = coalesce((v_item->>'precio_venta')::numeric, precio_venta),
-          categoria = coalesce(nullif(v_item->>'categoria', ''), categoria)
+          precio_venta = case when v_es_insumo then null else coalesce(v_precio_venta, precio_venta) end,
+          categoria = coalesce(nullif(v_item->>'categoria', ''), categoria),
+          es_insumo = v_es_insumo
       where id = v_existente_id;
       v_item_id := v_existente_id;
     else
-      insert into inventario_items (empresa_id, nombre, categoria, unidad, cantidad, costo, precio_venta)
+      insert into inventario_items (empresa_id, nombre, categoria, unidad, cantidad, costo, precio_venta, es_insumo)
       values (
         p_empresa_id,
         v_item->>'nombre',
@@ -491,7 +497,8 @@ begin
         coalesce(nullif(v_item->>'unidad', ''), 'unidad'),
         v_cantidad,
         v_costo,
-        (v_item->>'precio_venta')::numeric
+        v_precio_venta,
+        v_es_insumo
       )
       returning id into v_item_id;
       v_creados := v_creados + 1;
