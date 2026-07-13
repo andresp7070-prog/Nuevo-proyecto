@@ -386,7 +386,7 @@ export default async function InsightsPage() {
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Resumen general</h2>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border border-gray-200 p-4 md:col-span-2">
+          <div className="rounded-xl border border-gray-200 p-4">
             <h3 className="mb-3 text-xs font-medium text-gray-700">
               {mostrarPorAnio ? "Ventas por año" : "Ventas por mes"}
             </h3>
@@ -415,7 +415,7 @@ export default async function InsightsPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-gray-200 p-4 md:col-span-2">
+          <div className="rounded-xl border border-gray-200 p-4">
             <h3 className="mb-3 text-xs font-medium text-gray-700">Ventas por día de la semana</h3>
             {promedioGeneral > 0 ? (
               <GraficoBarras datos={barrasDiaSemana} />
@@ -460,7 +460,7 @@ export default async function InsightsPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-gray-200 p-4 md:col-span-2">
+          <div className="rounded-xl border border-gray-200 p-4">
             <h3 className="mb-3 text-xs font-medium text-gray-700">Margen por producto</h3>
             {barrasMargen.length === 0 ? (
               <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
