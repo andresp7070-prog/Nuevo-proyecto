@@ -19,6 +19,7 @@ export const UNIDADES: Unidad[] = [
   { valor: "litro", etiqueta: "Litro (L)", dimension: "volumen", factor: 1000 },
   { valor: "galon", etiqueta: "Galón", dimension: "volumen", factor: 3785.41 },
   { valor: "onza_liquida", etiqueta: "Onza líquida", dimension: "volumen", factor: 29.5735 },
+  { valor: "garrafa", etiqueta: "Garrafa (20 L)", dimension: "volumen", factor: 20000 },
   { valor: "centimetro", etiqueta: "Centímetro (cm)", dimension: "longitud", factor: 1 },
   { valor: "metro", etiqueta: "Metro (m)", dimension: "longitud", factor: 100 },
 ];
@@ -66,6 +67,8 @@ const SINONIMOS_UNIDAD: Record<string, string> = {
   "onza liquida": "onza_liquida",
   "onza_liquida": "onza_liquida",
   "oz liquida": "onza_liquida",
+  garrafa: "garrafa",
+  garrafas: "garrafa",
   centimetro: "centimetro",
   centimetros: "centimetro",
   cm: "centimetro",
