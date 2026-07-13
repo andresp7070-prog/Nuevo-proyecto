@@ -103,12 +103,6 @@ function etiquetaMesCorta(mes: string) {
   return primeraMayuscula(new Date(mes).toLocaleDateString("es-CO", { month: "short" }));
 }
 
-function etiquetaDiaCompleta(fecha: string) {
-  return primeraMayuscula(
-    new Date(fecha).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" }),
-  );
-}
-
 function sumarDiasIso(fecha: string, dias: number) {
   const d = new Date(`${fecha}T00:00:00`);
   d.setDate(d.getDate() + dias);
@@ -254,6 +248,34 @@ async function ContenidoInsights({
   const { periodo = "todo", desde: desdeParam, hasta: hastaParam, dia_semana: diaSemanaFiltro = "", producto: productoFiltro = "" } =
     searchParams;
   const rango = calcularRango(periodo as Periodo, desdeParam, hastaParam);
+
+  // Arma el enlace de una barra al hacer clic: parte de los filtros que ya
+  // están activos y solo cambia la dimensión que se está fijando — así el
+  // clic en una gráfica se suma a lo que ya estaba filtrado en otra, en vez
+  // de reemplazarlo.
+  function enlaceConFiltro(
+    overrides: Partial<{ periodo: string; desde: string; hasta: string; dia_semana: string; producto: string }>,
+  ) {
+    const base: Record<string, string | undefined> = {
+      periodo,
+      desde: desdeParam,
+      hasta: hastaParam,
+      dia_semana: diaSemanaFiltro || undefined,
+      producto: productoFiltro || undefined,
+      ...overrides,
+    };
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(base)) {
+      if (v) params.set(k, v);
+    }
+    return `?${params.toString()}`;
+  }
+
+  function ultimoDiaDelMes(mesIso: string) {
+    const d = new Date(`${mesIso}T00:00:00`);
+    const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return ultimo.toISOString().slice(0, 10);
+  }
 
   const supabase = await createClient();
   const {
@@ -440,8 +462,6 @@ async function ContenidoInsights({
     noFestivos.length > 0
       ? noFestivos.reduce((s, f) => s + f.total_vendido, 0) / noFestivos.length
       : null;
-  const festivosDetalle = [...festivos].sort((a, b) => a.dia.localeCompare(b.dia));
-
   const totalPorHora = Array.from({ length: 24 }, () => 0);
   for (const v of ventasConHora) {
     const horaUtc = new Date(v.fecha).getUTCHours();
@@ -466,6 +486,7 @@ async function ContenidoInsights({
         : peorDiaDestaca && d.dia === peorDia?.dia
           ? "alerta"
           : "default",
+    enlace: enlaceConFiltro({ dia_semana: d.dia }),
   }));
 
   const barrasMes: Barra[] = [...porMes]
@@ -474,6 +495,7 @@ async function ContenidoInsights({
       etiqueta: etiquetaMesCorta(f.mes),
       valor: f.utilidad_neta,
       textoValor: formatoMonedaCorta(f.utilidad_neta),
+      enlace: enlaceConFiltro({ periodo: "personalizado", desde: f.mes, hasta: ultimoDiaDelMes(f.mes) }),
     }));
 
   const barrasMargen: Barra[] = [...porProducto]
@@ -485,6 +507,7 @@ async function ContenidoInsights({
       valor: p.margen_porcentaje,
       textoValor: `${p.margen_porcentaje}%`,
       tono: p.margen_porcentaje < UMBRAL_MARGEN_BAJO ? "alerta" : "default",
+      enlace: enlaceConFiltro({ producto: p.item_id }),
     }));
 
   const añosConVentas = new Set(
@@ -505,6 +528,7 @@ async function ContenidoInsights({
           etiqueta: anio,
           valor: total,
           textoValor: formatoMonedaCorta(total),
+          enlace: enlaceConFiltro({ periodo: "personalizado", desde: `${anio}-01-01`, hasta: `${anio}-12-31` }),
         }))
     : [];
 
@@ -514,6 +538,7 @@ async function ContenidoInsights({
       etiqueta: etiquetaMesCorta(f.mes),
       valor: f.ingresos_por_ventas,
       textoValor: formatoMonedaCorta(f.ingresos_por_ventas),
+      enlace: enlaceConFiltro({ periodo: "personalizado", desde: f.mes, hasta: ultimoDiaDelMes(f.mes) }),
     }));
 
   const ventasPorDiaOrdenadas = [...ventasPorDia].sort((a, b) => a.dia.localeCompare(b.dia));
@@ -542,6 +567,7 @@ async function ContenidoInsights({
       etiqueta: p.nombre,
       valor: p.ingresos,
       textoValor: formatoMonedaCorta(p.ingresos),
+      enlace: enlaceConFiltro({ producto: p.item_id }),
     }));
 
   const utilidadNetaActual = porMes.reduce((s, f) => s + f.utilidad_neta, 0);
@@ -746,21 +772,7 @@ async function ContenidoInsights({
             {promedioFestivo === null && promedioNoFestivo === null ? (
               <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
             ) : (
-              <>
-                <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
-                {festivosDetalle.length > 0 && (
-                  <ul className="mt-3 space-y-1 text-xs text-gray-500">
-                    {festivosDetalle.map((f) => (
-                      <li key={f.dia} className="flex justify-between gap-2">
-                        <span>
-                          {etiquetaDiaCompleta(f.dia)} — {f.dia_semana}
-                        </span>
-                        <span className="text-gray-700">{formatoMonedaCorta(f.total_vendido)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
+              <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
             )}
           </div>
 

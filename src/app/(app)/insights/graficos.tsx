@@ -7,6 +7,10 @@ export type Barra = {
   valor: number;
   textoValor: string;
   tono?: "default" | "positivo" | "negativo" | "alerta";
+  // Si viene, la barra se puede hacer clic y navega ahí — así se arma un
+  // filtro (por mes, por día de la semana, por producto...) haciendo clic
+  // directo en la gráfica, sumándose a cualquier otro filtro ya activo.
+  enlace?: string;
 };
 
 const COLOR: Record<NonNullable<Barra["tono"]>, string> = {
@@ -54,12 +58,11 @@ export function GraficoBarras({
           const y = d.valor >= 0 ? baseY - h : baseY;
           const color = COLOR[d.tono ?? tonoAutomatico(d.valor)];
           const activo = hover === i;
-          return (
+          const contenido = (
             <g
-              key={i}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
-              className="cursor-default"
+              className={d.enlace ? "cursor-pointer" : "cursor-default"}
             >
               <rect
                 x={x}
@@ -84,11 +87,19 @@ export function GraficoBarras({
                 y={alto + 18}
                 textAnchor="middle"
                 fontSize={11}
-                fill="#898781"
+                fill={d.enlace ? color : "#898781"}
+                textDecoration={d.enlace ? "underline" : undefined}
               >
                 {d.etiqueta}
               </text>
             </g>
+          );
+          return d.enlace ? (
+            <a key={i} href={d.enlace} aria-label={`Filtrar por ${d.etiqueta}`}>
+              {contenido}
+            </a>
+          ) : (
+            <g key={i}>{contenido}</g>
           );
         })}
       </svg>
@@ -226,14 +237,19 @@ export function GraficoBarrasHorizontal({ datos }: { datos: Barra[] }) {
       {datos.map((d, i) => {
         const ancho = (Math.abs(d.valor) / maxAbs) * 100;
         const color = COLOR[d.tono ?? tonoAutomatico(d.valor)];
+        const Elemento = d.enlace ? "a" : "div";
         return (
-          <div
+          <Elemento
             key={i}
-            className="flex items-center gap-2 text-xs"
+            {...(d.enlace ? { href: d.enlace, "aria-label": `Filtrar por ${d.etiqueta}` } : {})}
+            className={`flex items-center gap-2 text-xs ${d.enlace ? "cursor-pointer hover:opacity-80" : ""}`}
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover(null)}
           >
-            <span className="w-36 shrink-0 truncate text-gray-600" title={d.etiqueta}>
+            <span
+              className={`w-36 shrink-0 truncate ${d.enlace ? "text-gray-900 underline" : "text-gray-600"}`}
+              title={d.etiqueta}
+            >
               {d.etiqueta}
             </span>
             <div className="h-4 flex-1 rounded-lg bg-gray-100">
@@ -247,7 +263,7 @@ export function GraficoBarrasHorizontal({ datos }: { datos: Barra[] }) {
               />
             </div>
             <span className="w-20 shrink-0 text-right text-gray-700">{d.textoValor}</span>
-          </div>
+          </Elemento>
         );
       })}
     </div>
