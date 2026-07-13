@@ -22,7 +22,13 @@ type FilaProducto = {
 
 type FilaMes = {
   mes: string;
+  ingresos_por_ventas: number;
   utilidad_neta: number;
+};
+
+type FilaCategoria = {
+  categoria: string | null;
+  ingresos: number;
 };
 
 type FilaPerfilCliente = {
@@ -97,6 +103,7 @@ export default async function InsightsPage() {
     { data: ventasPorDiaData },
     { data: porProductoData },
     { data: porMesData },
+    { data: porCategoriaData },
     { data: perfilesClienteData },
     { data: contactosData },
     { data: ventasHoraData },
@@ -112,9 +119,13 @@ export default async function InsightsPage() {
       .order("utilidad", { ascending: false }),
     supabase
       .from("vista_estado_resultados")
-      .select("mes, utilidad_neta")
+      .select("mes, ingresos_por_ventas, utilidad_neta")
       .eq("empresa_id", perfil.empresa_id)
       .order("mes", { ascending: false }),
+    supabase
+      .from("vista_utilidad_por_categoria")
+      .select("categoria, ingresos")
+      .eq("empresa_id", perfil.empresa_id),
     supabase
       .from("vista_perfil_cliente")
       .select("contacto_id, ultima_compra, dias_promedio_entre_compras")
@@ -126,6 +137,7 @@ export default async function InsightsPage() {
   const ventasPorDia = (ventasPorDiaData ?? []) as FilaVentaDia[];
   const porProducto = (porProductoData ?? []) as FilaProducto[];
   const porMes = (porMesData ?? []) as FilaMes[];
+  const porCategoria = (porCategoriaData ?? []) as FilaCategoria[];
   const perfilesCliente = (perfilesClienteData ?? []) as FilaPerfilCliente[];
   const contactos = (contactosData ?? []) as Contacto[];
   const nombrePorContacto = new Map(contactos.map((c) => [c.id, c.nombre]));
@@ -211,6 +223,78 @@ export default async function InsightsPage() {
       textoValor: `${p.margen_porcentaje}%`,
       tono: p.margen_porcentaje < UMBRAL_MARGEN_BAJO ? "alerta" : "default",
     }));
+
+  // Ventas por año: solo tiene sentido compararlas si hay más de un año con
+  // datos — si no, se muestra el total por mes en su lugar (más abajo).
+  const añosConVentas = new Set(
+    porMes.filter((f) => f.ingresos_por_ventas > 0).map((f) => f.mes.slice(0, 4)),
+  );
+  const mostrarPorAnio = añosConVentas.size >= 2;
+
+  const barrasAnio: Barra[] = mostrarPorAnio
+    ? Array.from(
+        porMes.reduce((mapa, f) => {
+          const anio = f.mes.slice(0, 4);
+          mapa.set(anio, (mapa.get(anio) ?? 0) + f.ingresos_por_ventas);
+          return mapa;
+        }, new Map<string, number>()),
+      )
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([anio, total]) => ({
+          etiqueta: anio,
+          valor: total,
+          textoValor: formatoMonedaCorta(total),
+        }))
+    : [];
+
+  const barrasVentasMes: Barra[] = [...porMes]
+    .sort((a, b) => a.mes.localeCompare(b.mes))
+    .map((f) => ({
+      etiqueta: etiquetaMesCorta(f.mes),
+      valor: f.ingresos_por_ventas,
+      textoValor: formatoMonedaCorta(f.ingresos_por_ventas),
+    }));
+
+  const ventasPorDiaOrdenadas = [...ventasPorDia].sort((a, b) => a.dia.localeCompare(b.dia));
+  const puntosVentasPorDia: PuntoLinea[] = ventasPorDiaOrdenadas.map((f, i) => ({
+    etiqueta: new Date(f.dia).toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit" }),
+    valor: f.total_vendido,
+    textoValor: formatoMonedaCorta(f.total_vendido),
+    mostrarEtiqueta: i % Math.max(1, Math.ceil(ventasPorDiaOrdenadas.length / 10)) === 0,
+  }));
+
+  const barrasCategoria: Barra[] = [...porCategoria]
+    .filter((c) => c.ingresos > 0)
+    .sort((a, b) => b.ingresos - a.ingresos)
+    .slice(0, 10)
+    .map((c) => ({
+      etiqueta: c.categoria ?? "Sin categoría",
+      valor: c.ingresos,
+      textoValor: formatoMonedaCorta(c.ingresos),
+    }));
+
+  const barrasProductoVentas: Barra[] = [...porProducto]
+    .filter((p) => p.ingresos > 0)
+    .sort((a, b) => b.ingresos - a.ingresos)
+    .slice(0, 10)
+    .map((p) => ({
+      etiqueta: p.nombre,
+      valor: p.ingresos,
+      textoValor: formatoMonedaCorta(p.ingresos),
+    }));
+
+  const barrasFestivos: Barra[] = [
+    {
+      etiqueta: "Normal",
+      valor: promedioNoFestivo ?? 0,
+      textoValor: promedioNoFestivo !== null ? formatoMonedaCorta(promedioNoFestivo) : "Sin datos",
+    },
+    {
+      etiqueta: "Festivo",
+      valor: promedioFestivo ?? 0,
+      textoValor: promedioFestivo !== null ? formatoMonedaCorta(promedioFestivo) : "Sin datos",
+    },
+  ];
 
   // ---- Insights: solo lo que cruza un umbral ----
   type Insight = { titulo: string; detalle: string };
@@ -302,7 +386,36 @@ export default async function InsightsPage() {
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Resumen general</h2>
 
         <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-gray-200 p-4 md:col-span-2">
+            <h3 className="mb-3 text-xs font-medium text-gray-700">
+              {mostrarPorAnio ? "Ventas por año" : "Ventas por mes"}
+            </h3>
+            {(mostrarPorAnio ? barrasAnio : barrasVentasMes).length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
+            ) : (
+              <GraficoBarras datos={mostrarPorAnio ? barrasAnio : barrasVentasMes} />
+            )}
+          </div>
+
           <div className="rounded-xl border border-gray-200 p-4">
+            <h3 className="mb-3 text-xs font-medium text-gray-700">Ventas por día</h3>
+            {puntosVentasPorDia.length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoLinea puntos={puntosVentasPorDia} />
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h3 className="mb-3 text-xs font-medium text-gray-700">Ventas por hora del día</h3>
+            {ventasConHora.length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoLinea puntos={puntosHora} />
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4 md:col-span-2">
             <h3 className="mb-3 text-xs font-medium text-gray-700">Ventas por día de la semana</h3>
             {promedioGeneral > 0 ? (
               <GraficoBarras datos={barrasDiaSemana} />
@@ -312,47 +425,47 @@ export default async function InsightsPage() {
           </div>
 
           <div className="rounded-xl border border-gray-200 p-4">
-            <h3 className="mb-3 text-xs font-medium text-gray-700">Festivos vs. días normales</h3>
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Promedio en festivos</dt>
-                <dd className="text-gray-900">
-                  {promedioFestivo !== null ? formatoMoneda(promedioFestivo) : "Sin datos"}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Promedio en días normales</dt>
-                <dd className="text-gray-900">
-                  {promedioNoFestivo !== null ? formatoMoneda(promedioNoFestivo) : "Sin datos"}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 p-4 md:col-span-2">
-            <h3 className="mb-3 text-xs font-medium text-gray-700">Ventas por hora del día</h3>
-            {ventasConHora.length === 0 ? (
-              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
-            ) : (
-              <GraficoLinea puntos={puntosHora} />
-            )}
-          </div>
-
-          <div className="rounded-xl border border-gray-200 p-4">
-            <h3 className="mb-3 text-xs font-medium text-gray-700">Margen por producto</h3>
-            {barrasMargen.length === 0 ? (
-              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
-            ) : (
-              <GraficoBarrasHorizontal datos={barrasMargen} />
-            )}
-          </div>
-
-          <div className="rounded-xl border border-gray-200 p-4">
             <h3 className="mb-3 text-xs font-medium text-gray-700">Utilidad por mes</h3>
             {barrasMes.length === 0 ? (
               <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
             ) : (
               <GraficoBarras datos={barrasMes} />
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h3 className="mb-3 text-xs font-medium text-gray-700">Categorías con más ventas</h3>
+            {barrasCategoria.length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoBarrasHorizontal datos={barrasCategoria} />
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h3 className="mb-3 text-xs font-medium text-gray-700">Productos con más ventas</h3>
+            {barrasProductoVentas.length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoBarrasHorizontal datos={barrasProductoVentas} />
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h3 className="mb-3 text-xs font-medium text-gray-700">Festivos vs. días normales</h3>
+            {promedioFestivo === null && promedioNoFestivo === null ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoBarras datos={barrasFestivos} />
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4 md:col-span-2">
+            <h3 className="mb-3 text-xs font-medium text-gray-700">Margen por producto</h3>
+            {barrasMargen.length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoBarrasHorizontal datos={barrasMargen} />
             )}
           </div>
 
@@ -393,6 +506,8 @@ export default async function InsightsPage() {
           )}
         </div>
       </div>
+
+      <hr className="border-gray-200" />
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Insights encontrados</h2>
