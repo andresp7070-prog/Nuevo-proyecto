@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -54,6 +55,24 @@ type FilaVentaItemRaw = {
   ventas: { fecha: string } | { fecha: string }[] | null;
 };
 
+// Una fila "aplanada": una línea de venta, ya con su fecha, día de la
+// semana, si fue festivo y la hora — para poder recalcular cualquier
+// gráfica en JS cuando hay un filtro de producto o de día de la semana
+// activo (las vistas de Supabase no tienen esas columnas para filtrar).
+type FilaUnificada = {
+  diaStr: string;
+  diaSemana: string;
+  esFestivo: boolean;
+  hora: number;
+  itemId: string;
+  nombre: string;
+  categoria: string | null;
+  ingresos: number;
+  costos: number;
+};
+
+const NOMBRE_DIA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
 function formatoMoneda(valor: number) {
   return valor.toLocaleString("es-CO", { style: "currency", currency: "COP" });
 }
@@ -89,44 +108,90 @@ function sumarDiasIso(fecha: string, dias: number) {
   return d.toISOString().slice(0, 10);
 }
 
-const ORDEN_DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-const ABREVIATURA_DIA: Record<string, string> = {
-  Lunes: "Lun",
-  Martes: "Mar",
-  Miércoles: "Mié",
-  Jueves: "Jue",
-  Viernes: "Vie",
-  Sábado: "Sáb",
-  Domingo: "Dom",
-};
-const UMBRAL_DESVIACION_DIA = 0.2; // 20%
-const UMBRAL_MARGEN_BAJO = 15; // %
-
-// Junta las líneas de venta ya filtradas por fecha en totales por producto y
-// por categoría — se usa cuando hay un filtro de período activo, porque las
-// vistas vista_utilidad_por_producto/categoria no tienen columna de fecha
-// para filtrar (agregan todo el histórico).
-function agregarPorProductoYCategoria(filas: FilaVentaItemRaw[]) {
-  const porProductoMapa = new Map<
-    string,
-    { nombre: string; categoria: string | null; ingresos: number; costos: number }
-  >();
-
+function aplanarFilas(filas: FilaVentaItemRaw[], festivosSet: Set<string>): FilaUnificada[] {
+  const resultado: FilaUnificada[] = [];
   for (const f of filas) {
+    const v = Array.isArray(f.ventas) ? f.ventas[0] : f.ventas;
     const item = Array.isArray(f.inventario_items) ? f.inventario_items[0] : f.inventario_items;
-    if (!item) continue;
-    const ingresos = f.cantidad * f.precio_unitario;
-    const costos = f.cantidad * (f.costo_unitario ?? 0);
-    const actual = porProductoMapa.get(f.item_id) ?? {
+    if (!v?.fecha || !item) continue;
+    const diaStr = v.fecha.slice(0, 10);
+    const diaSemana = NOMBRE_DIA[new Date(`${diaStr}T00:00:00Z`).getUTCDay()];
+    // Colombia no tiene horario de verano — el desfase con UTC siempre es -5.
+    const horaUtc = new Date(v.fecha).getUTCHours();
+    const hora = (horaUtc + 24 - 5) % 24;
+    resultado.push({
+      diaStr,
+      diaSemana,
+      esFestivo: festivosSet.has(diaStr),
+      hora,
+      itemId: f.item_id,
       nombre: item.nombre,
       categoria: item.categoria,
+      ingresos: f.cantidad * f.precio_unitario,
+      costos: f.cantidad * (f.costo_unitario ?? 0),
+    });
+  }
+  return resultado;
+}
+
+// A partir de las filas aplanadas, reconstruye los mismos "shapes" que usan
+// las vistas de Supabase (ventasPorDia, porMes, porProducto, porCategoria,
+// ventasConHora) para que el resto de la página no tenga que saber de dónde
+// salieron los datos.
+function derivarDesdeUnificadas(filas: FilaUnificada[]) {
+  const porDiaMapa = new Map<string, { dia: string; dia_semana: string; es_festivo: boolean; total: number; n: number }>();
+  const porMesMapa = new Map<string, { ingresos: number; utilidad: number }>();
+  const porProductoMapa = new Map<string, { nombre: string; categoria: string | null; ingresos: number; costos: number }>();
+  const ventasConHora: { fecha: string; monto: number }[] = [];
+
+  for (const f of filas) {
+    const dia = porDiaMapa.get(f.diaStr) ?? {
+      dia: f.diaStr,
+      dia_semana: f.diaSemana,
+      es_festivo: f.esFestivo,
+      total: 0,
+      n: 0,
+    };
+    dia.total += f.ingresos;
+    dia.n += 1;
+    porDiaMapa.set(f.diaStr, dia);
+
+    const mesKey = `${f.diaStr.slice(0, 7)}-01`;
+    const mes = porMesMapa.get(mesKey) ?? { ingresos: 0, utilidad: 0 };
+    mes.ingresos += f.ingresos;
+    mes.utilidad += f.ingresos - f.costos;
+    porMesMapa.set(mesKey, mes);
+
+    const prod = porProductoMapa.get(f.itemId) ?? {
+      nombre: f.nombre,
+      categoria: f.categoria,
       ingresos: 0,
       costos: 0,
     };
-    actual.ingresos += ingresos;
-    actual.costos += costos;
-    porProductoMapa.set(f.item_id, actual);
+    prod.ingresos += f.ingresos;
+    prod.costos += f.costos;
+    porProductoMapa.set(f.itemId, prod);
   }
+
+  // ventasConHora se usa para la gráfica por hora — una fila "sintética" por
+  // línea de venta alcanza, ya que solo se usa la hora y el monto.
+  for (const f of filas) {
+    ventasConHora.push({ fecha: `1970-01-01T${String(f.hora).padStart(2, "0")}:00:00Z`, monto: f.ingresos });
+  }
+
+  const ventasPorDia: FilaVentaDia[] = Array.from(porDiaMapa.values()).map((d) => ({
+    dia: d.dia,
+    dia_semana: d.dia_semana,
+    es_festivo: d.es_festivo,
+    numero_ventas: d.n,
+    total_vendido: d.total,
+  }));
+
+  const porMes: FilaMes[] = Array.from(porMesMapa.entries()).map(([mes, v]) => ({
+    mes,
+    ingresos_por_ventas: v.ingresos,
+    utilidad_neta: v.utilidad,
+  }));
 
   const porProducto: FilaProducto[] = Array.from(porProductoMapa.entries()).map(([itemId, v]) => {
     const utilidad = v.ingresos - v.costos;
@@ -148,15 +213,29 @@ function agregarPorProductoYCategoria(filas: FilaVentaItemRaw[]) {
     ([categoria, ingresos]) => ({ categoria, ingresos }),
   );
 
-  return { porProducto, porCategoria };
+  return { ventasPorDia, porMes, porProducto, porCategoria, ventasConHora };
 }
 
-export default async function InsightsPage({
+const ORDEN_DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const ABREVIATURA_DIA: Record<string, string> = {
+  Lunes: "Lun",
+  Martes: "Mar",
+  Miércoles: "Mié",
+  Jueves: "Jue",
+  Viernes: "Vie",
+  Sábado: "Sáb",
+  Domingo: "Dom",
+};
+const UMBRAL_DESVIACION_DIA = 0.2; // 20%
+const UMBRAL_MARGEN_BAJO = 15; // %
+
+async function ContenidoInsights({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string; desde?: string; hasta?: string }>;
+  searchParams: { periodo?: string; desde?: string; hasta?: string; dia_semana?: string; producto?: string };
 }) {
-  const { periodo = "todo", desde: desdeParam, hasta: hastaParam } = await searchParams;
+  const { periodo = "todo", desde: desdeParam, hasta: hastaParam, dia_semana: diaSemanaFiltro = "", producto: productoFiltro = "" } =
+    searchParams;
   const rango = calcularRango(periodo as Periodo, desdeParam, hastaParam);
 
   const supabase = await createClient();
@@ -180,29 +259,8 @@ export default async function InsightsPage({
   }
   const empresaId = perfil.empresa_id;
 
-  let queryVentasPorDia = supabase
-    .from("vista_ventas_por_dia")
-    .select("dia, dia_semana, es_festivo, numero_ventas, total_vendido")
-    .eq("empresa_id", empresaId);
-  let queryPorMes = supabase
-    .from("vista_estado_resultados")
-    .select("mes, ingresos_por_ventas, utilidad_neta")
-    .eq("empresa_id", empresaId)
-    .order("mes", { ascending: false });
-
-  if (rango) {
-    queryVentasPorDia = queryVentasPorDia.gte("dia", rango.desde).lte("dia", rango.hasta);
-    queryPorMes = queryPorMes.gte("mes", `${rango.desde.slice(0, 7)}-01`).lte("mes", rango.hasta);
-  }
-
-  const [
-    { data: ventasPorDiaData },
-    { data: porMesData },
-    { data: perfilesClienteData },
-    { data: contactosData },
-  ] = await Promise.all([
-    queryVentasPorDia,
-    queryPorMes,
+  const [{ data: productosData }, { data: perfilesClienteData }, { data: contactosData }] = await Promise.all([
+    supabase.from("inventario_items").select("id, nombre").eq("empresa_id", empresaId).order("nombre"),
     supabase
       .from("vista_perfil_cliente")
       .select("contacto_id, ultima_compra, dias_promedio_entre_compras")
@@ -210,95 +268,106 @@ export default async function InsightsPage({
     supabase.from("crm_contactos").select("id, nombre").eq("empresa_id", empresaId),
   ]);
 
-  // Ventas crudas: si hay filtro, se traen desde el inicio del período
-  // anterior de una sola vez y se parten en JS — así el total del período
-  // anterior sale del mismo viaje a la base de datos.
-  const { data: ventasRawData } = await supabase
-    .from("ventas")
-    .select("fecha, monto")
-    .eq("empresa_id", empresaId)
-    .gte("fecha", `${rango ? rango.desdeAnterior : "1900-01-01"}T00:00:00`)
-    .lt("fecha", `${rango ? sumarDiasIso(rango.hasta, 1) : "2999-01-01"}T00:00:00`);
+  const productos = (productosData ?? []) as { id: string; nombre: string }[];
+  const perfilesCliente = (perfilesClienteData ?? []) as FilaPerfilCliente[];
+  const contactos = (contactosData ?? []) as Contacto[];
+  const nombrePorContacto = new Map(contactos.map((c) => [c.id, c.nombre]));
 
-  const ventasRaw = (ventasRawData ?? []) as { fecha: string; monto: number }[];
-  const ventasConHora = rango
-    ? ventasRaw.filter((v) => v.fecha.slice(0, 10) >= rango.desde && v.fecha.slice(0, 10) <= rango.hasta)
-    : ventasRaw;
-  const totalVentasActual = ventasConHora.reduce((s, v) => s + v.monto, 0);
-  const totalVentasAnterior = rango
-    ? ventasRaw
-        .filter((v) => v.fecha.slice(0, 10) < rango.desde)
-        .reduce((s, v) => s + v.monto, 0)
-    : 0;
+  const sinFiltros = !rango && !diaSemanaFiltro && !productoFiltro;
 
-  // Productos y categorías: sin filtro se usan las vistas ya agregadas (más
-  // simples y rápidas). Con filtro, se recalculan desde ventas_items crudas
-  // porque las vistas no tienen columna de fecha.
+  let ventasPorDia: FilaVentaDia[];
+  let porMes: FilaMes[];
   let porProducto: FilaProducto[];
   let porCategoria: FilaCategoria[];
-  let porProductoAnterior: FilaProducto[] = [];
+  let ventasConHora: { fecha: string; monto: number }[];
 
-  if (!rango) {
-    const [{ data: porProductoData }, { data: porCategoriaData }] = await Promise.all([
+  let totalVentasActual = 0;
+  let totalVentasAnterior = 0;
+  let utilidadNetaAnterior = 0;
+  let utilidadAnteriorTotal = 0;
+  let ingresosAnteriorProductos = 0;
+
+  if (sinFiltros) {
+    const [
+      { data: ventasPorDiaData },
+      { data: porMesData },
+      { data: porProductoData },
+      { data: porCategoriaData },
+      { data: ventasHoraData },
+    ] = await Promise.all([
+      supabase
+        .from("vista_ventas_por_dia")
+        .select("dia, dia_semana, es_festivo, numero_ventas, total_vendido")
+        .eq("empresa_id", empresaId),
+      supabase
+        .from("vista_estado_resultados")
+        .select("mes, ingresos_por_ventas, utilidad_neta")
+        .eq("empresa_id", empresaId)
+        .order("mes", { ascending: false }),
       supabase
         .from("vista_utilidad_por_producto")
         .select("item_id, nombre, ingresos, utilidad, margen_porcentaje")
         .eq("empresa_id", empresaId),
       supabase.from("vista_utilidad_por_categoria").select("categoria, ingresos").eq("empresa_id", empresaId),
+      supabase.from("ventas").select("fecha, monto").eq("empresa_id", empresaId),
     ]);
+
+    ventasPorDia = (ventasPorDiaData ?? []) as FilaVentaDia[];
+    porMes = (porMesData ?? []) as FilaMes[];
     porProducto = (porProductoData ?? []) as FilaProducto[];
     porCategoria = (porCategoriaData ?? []) as FilaCategoria[];
+    ventasConHora = (ventasHoraData ?? []) as { fecha: string; monto: number }[];
+    totalVentasActual = ventasConHora.reduce((s, v) => s + v.monto, 0);
+    utilidadNetaAnterior = 0;
   } else {
-    const { data: ventasItemsRawData } = await supabase
+    // Con cualquier filtro activo (período, día de la semana o producto) se
+    // recalcula todo desde ventas_items en crudo, porque las vistas no
+    // tienen ni columna de fecha ni de producto para filtrar juntas.
+    const desdeAmplio = rango ? rango.desdeAnterior : "1900-01-01";
+    const hastaAmplio = rango ? rango.hasta : "2999-01-01";
+
+    let query = supabase
       .from("ventas_items")
       .select(
         "cantidad, precio_unitario, costo_unitario, item_id, inventario_items ( nombre, categoria ), ventas!inner ( fecha, empresa_id )",
       )
       .eq("ventas.empresa_id", empresaId)
-      .gte("ventas.fecha", `${rango.desdeAnterior}T00:00:00`)
-      .lt("ventas.fecha", `${sumarDiasIso(rango.hasta, 1)}T00:00:00`);
+      .gte("ventas.fecha", `${desdeAmplio}T00:00:00`)
+      .lt("ventas.fecha", `${sumarDiasIso(hastaAmplio, 1)}T00:00:00`);
 
-    const filas = (ventasItemsRawData ?? []) as FilaVentaItemRaw[];
-    const filasActual = filas.filter((f) => {
-      const v = Array.isArray(f.ventas) ? f.ventas[0] : f.ventas;
-      const fecha = v?.fecha.slice(0, 10) ?? "";
-      return fecha >= rango.desde && fecha <= rango.hasta;
-    });
-    const filasAnterior = filas.filter((f) => {
-      const v = Array.isArray(f.ventas) ? f.ventas[0] : f.ventas;
-      const fecha = v?.fecha.slice(0, 10) ?? "";
-      return fecha < rango.desde;
-    });
+    if (productoFiltro) query = query.eq("item_id", productoFiltro);
 
-    const agregadoActual = agregarPorProductoYCategoria(filasActual);
-    const agregadoAnterior = agregarPorProductoYCategoria(filasAnterior);
-    porProducto = agregadoActual.porProducto;
-    porCategoria = agregadoActual.porCategoria;
-    porProductoAnterior = agregadoAnterior.porProducto;
-  }
+    const [{ data: filasRawData }, { data: festivosData }] = await Promise.all([
+      query,
+      supabase.from("festivos").select("fecha"),
+    ]);
 
-  const utilidadAnteriorTotal = porProductoAnterior.reduce((s, p) => s + p.utilidad, 0);
-  const ingresosAnteriorProductos = porProductoAnterior.reduce((s, p) => s + p.ingresos, 0);
+    const festivosSet = new Set((festivosData ?? []).map((f) => f.fecha as string));
+    let todasLasFilas = aplanarFilas((filasRawData ?? []) as FilaVentaItemRaw[], festivosSet);
 
-  const ventasPorDia = (ventasPorDiaData ?? []) as FilaVentaDia[];
-  const porMes = (porMesData ?? []) as FilaMes[];
-  const perfilesCliente = (perfilesClienteData ?? []) as FilaPerfilCliente[];
-  const contactos = (contactosData ?? []) as Contacto[];
-  const nombrePorContacto = new Map(contactos.map((c) => [c.id, c.nombre]));
+    if (diaSemanaFiltro) {
+      todasLasFilas = todasLasFilas.filter((f) => f.diaSemana === diaSemanaFiltro);
+    }
 
-  // Utilidad neta del período anterior, para la variación de "Utilidad por mes".
-  let utilidadNetaAnterior = 0;
-  if (rango) {
-    const { data: porMesAnteriorData } = await supabase
-      .from("vista_estado_resultados")
-      .select("mes, utilidad_neta")
-      .eq("empresa_id", empresaId)
-      .gte("mes", `${rango.desdeAnterior.slice(0, 7)}-01`)
-      .lte("mes", rango.hastaAnterior);
-    utilidadNetaAnterior = (porMesAnteriorData ?? []).reduce(
-      (s, f) => s + (f.utilidad_neta as number),
-      0,
-    );
+    const filasActual = rango
+      ? todasLasFilas.filter((f) => f.diaStr >= rango.desde && f.diaStr <= rango.hasta)
+      : todasLasFilas;
+    const filasAnterior = rango ? todasLasFilas.filter((f) => f.diaStr < rango.desde) : [];
+
+    const derivadoActual = derivarDesdeUnificadas(filasActual);
+    const derivadoAnterior = derivarDesdeUnificadas(filasAnterior);
+
+    ventasPorDia = derivadoActual.ventasPorDia;
+    porMes = derivadoActual.porMes;
+    porProducto = derivadoActual.porProducto;
+    porCategoria = derivadoActual.porCategoria;
+    ventasConHora = derivadoActual.ventasConHora;
+
+    totalVentasActual = filasActual.reduce((s, f) => s + f.ingresos, 0);
+    totalVentasAnterior = filasAnterior.reduce((s, f) => s + f.ingresos, 0);
+    utilidadNetaAnterior = derivadoAnterior.porMes.reduce((s, f) => s + f.utilidad_neta, 0);
+    utilidadAnteriorTotal = derivadoAnterior.porProducto.reduce((s, p) => s + p.utilidad, 0);
+    ingresosAnteriorProductos = derivadoAnterior.porProducto.reduce((s, p) => s + p.ingresos, 0);
   }
 
   // ---- Agregados para el resumen general ----
@@ -328,6 +397,16 @@ export default async function InsightsPage({
   const peorDiaDestaca =
     promedioGeneral > 0 && peorDia && peorDia.promedio <= promedioGeneral * (1 - UMBRAL_DESVIACION_DIA);
 
+  // Festivo vs. normal, día de semana por día de semana — para responder
+  // directamente "lunes vs. lunes festivo, martes vs. martes festivo...".
+  const festivosPorDiaSemana = ORDEN_DIAS.map((dia) => {
+    const normales = ventasPorDia.filter((f) => f.dia_semana === dia && !f.es_festivo);
+    const festivosDia = ventasPorDia.filter((f) => f.dia_semana === dia && f.es_festivo);
+    const promedioNormalDia = normales.length > 0 ? normales.reduce((s, f) => s + f.total_vendido, 0) / normales.length : null;
+    const promedioFestivoDia = festivosDia.length > 0 ? festivosDia.reduce((s, f) => s + f.total_vendido, 0) / festivosDia.length : null;
+    return { dia, promedioNormalDia, promedioFestivoDia, cantidadFestivos: festivosDia.length };
+  });
+
   const festivos = ventasPorDia.filter((f) => f.es_festivo);
   const noFestivos = ventasPorDia.filter((f) => !f.es_festivo);
   const promedioFestivo =
@@ -338,11 +417,10 @@ export default async function InsightsPage({
       : null;
   const festivosDetalle = [...festivos].sort((a, b) => a.dia.localeCompare(b.dia));
 
-  // Colombia no tiene horario de verano — el desfase con UTC siempre es -5.
   const totalPorHora = Array.from({ length: 24 }, () => 0);
   for (const v of ventasConHora) {
     const horaUtc = new Date(v.fecha).getUTCHours();
-    const horaColombia = (horaUtc + 24 - 5) % 24;
+    const horaColombia = sinFiltros ? (horaUtc + 24 - 5) % 24 : horaUtc;
     totalPorHora[horaColombia] += v.monto;
   }
   const puntosHora: PuntoLinea[] = totalPorHora.map((total, hora) => ({
@@ -384,12 +462,10 @@ export default async function InsightsPage({
       tono: p.margen_porcentaje < UMBRAL_MARGEN_BAJO ? "alerta" : "default",
     }));
 
-  // Ventas por año: solo tiene sentido compararlas si hay más de un año con
-  // datos — si no, se muestra el total por mes en su lugar (más abajo).
   const añosConVentas = new Set(
     porMes.filter((f) => f.ingresos_por_ventas > 0).map((f) => f.mes.slice(0, 4)),
   );
-  const mostrarPorAnio = !rango && añosConVentas.size >= 2;
+  const mostrarPorAnio = sinFiltros && añosConVentas.size >= 2;
 
   const barrasAnio: Barra[] = mostrarPorAnio
     ? Array.from(
@@ -443,23 +519,9 @@ export default async function InsightsPage({
       textoValor: formatoMonedaCorta(p.ingresos),
     }));
 
-  const barrasFestivos: Barra[] = [
-    {
-      etiqueta: "Normal",
-      valor: promedioNoFestivo ?? 0,
-      textoValor: promedioNoFestivo !== null ? formatoMonedaCorta(promedioNoFestivo) : "Sin datos",
-    },
-    {
-      etiqueta: "Festivo",
-      valor: promedioFestivo ?? 0,
-      textoValor: promedioFestivo !== null ? formatoMonedaCorta(promedioFestivo) : "Sin datos",
-    },
-  ];
-
   const utilidadNetaActual = porMes.reduce((s, f) => s + f.utilidad_neta, 0);
   const ingresosProductosActual = porProducto.reduce((s, p) => s + p.ingresos, 0);
   const categoriaIngresosActual = porCategoria.reduce((s, c) => s + c.ingresos, 0);
-  const categoriaIngresosAnterior = ingresosAnteriorProductos;
 
   // ---- Insights: solo lo que cruza un umbral ----
   type Insight = { titulo: string; detalle: string };
@@ -503,8 +565,9 @@ export default async function InsightsPage({
     });
   }
 
-  if (!rango && porMes.length >= 2) {
-    const [ultimo, anterior] = porMes;
+  if (sinFiltros && porMes.length >= 2) {
+    const ordenadoDesc = [...porMes].sort((a, b) => b.mes.localeCompare(a.mes));
+    const [ultimo, anterior] = ordenadoDesc;
     if (ultimo.utilidad_neta < anterior.utilidad_neta) {
       insights.push({
         titulo: `La utilidad bajó en ${etiquetaMes(ultimo.mes)}`,
@@ -538,6 +601,8 @@ export default async function InsightsPage({
     });
   }
 
+  const hayComparacion = Boolean(rango);
+
   return (
     <div className="space-y-8">
       <div>
@@ -547,7 +612,12 @@ export default async function InsightsPage({
         </p>
       </div>
 
-      <FiltroFecha periodoActual={periodo} />
+      <FiltroFecha
+        periodoActual={periodo}
+        diaSemanaActual={diaSemanaFiltro}
+        productoActual={productoFiltro}
+        productos={productos}
+      />
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Resumen general</h2>
@@ -558,7 +628,7 @@ export default async function InsightsPage({
               <h3 className="text-xs font-medium text-gray-700">
                 {mostrarPorAnio ? "Ventas por año" : "Ventas por mes"}
               </h3>
-              {rango && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
             </div>
             {(mostrarPorAnio ? barrasAnio : barrasVentasMes).length === 0 ? (
               <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
@@ -570,7 +640,7 @@ export default async function InsightsPage({
           <div className="rounded-xl border-2 border-gray-200 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Ventas por día</h3>
-              {rango && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
             </div>
             {puntosVentasPorDia.length === 0 ? (
               <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
@@ -582,7 +652,7 @@ export default async function InsightsPage({
           <div className="rounded-xl border-2 border-gray-200 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Ventas por hora del día</h3>
-              {rango && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
             </div>
             {ventasConHora.length === 0 ? (
               <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
@@ -594,7 +664,7 @@ export default async function InsightsPage({
           <div className="rounded-xl border-2 border-gray-200 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Ventas por día de la semana</h3>
-              {rango && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
             </div>
             {promedioGeneral > 0 ? (
               <GraficoBarras datos={barrasDiaSemana} />
@@ -606,7 +676,7 @@ export default async function InsightsPage({
           <div className="rounded-xl border-2 border-gray-200 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Utilidad por mes</h3>
-              {rango && <VariacionBadge actual={utilidadNetaActual} anterior={utilidadNetaAnterior} />}
+              {hayComparacion && <VariacionBadge actual={utilidadNetaActual} anterior={utilidadNetaAnterior} />}
             </div>
             {barrasMes.length === 0 ? (
               <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
@@ -618,8 +688,8 @@ export default async function InsightsPage({
           <div className="rounded-xl border-2 border-gray-200 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Categorías con más ventas</h3>
-              {rango && (
-                <VariacionBadge actual={categoriaIngresosActual} anterior={categoriaIngresosAnterior} />
+              {hayComparacion && (
+                <VariacionBadge actual={categoriaIngresosActual} anterior={ingresosAnteriorProductos} />
               )}
             </div>
             {barrasCategoria.length === 0 ? (
@@ -632,7 +702,7 @@ export default async function InsightsPage({
           <div className="rounded-xl border-2 border-gray-200 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Productos con más ventas</h3>
-              {rango && (
+              {hayComparacion && (
                 <VariacionBadge actual={ingresosProductosActual} anterior={ingresosAnteriorProductos} />
               )}
             </div>
@@ -646,13 +716,52 @@ export default async function InsightsPage({
           <div className="rounded-xl border-2 border-gray-200 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Festivos vs. días normales</h3>
-              {rango && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
             </div>
             {promedioFestivo === null && promedioNoFestivo === null ? (
               <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
             ) : (
               <>
-                <GraficoBarras datos={barrasFestivos} />
+                <GraficoBarras
+                  datos={[
+                    {
+                      etiqueta: "Normal",
+                      valor: promedioNoFestivo ?? 0,
+                      textoValor: promedioNoFestivo !== null ? formatoMonedaCorta(promedioNoFestivo) : "Sin datos",
+                    },
+                    {
+                      etiqueta: "Festivo",
+                      valor: promedioFestivo ?? 0,
+                      textoValor: promedioFestivo !== null ? formatoMonedaCorta(promedioFestivo) : "Sin datos",
+                    },
+                  ]}
+                />
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="text-gray-400">
+                        <th className="pb-1 font-medium">Día</th>
+                        <th className="pb-1 font-medium">Normal</th>
+                        <th className="pb-1 font-medium">Festivo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {festivosPorDiaSemana.map((d) => (
+                        <tr key={d.dia}>
+                          <td className="py-1 text-gray-700">{d.dia}</td>
+                          <td className="py-1 text-gray-900">
+                            {d.promedioNormalDia !== null ? formatoMonedaCorta(d.promedioNormalDia) : "—"}
+                          </td>
+                          <td className="py-1 text-gray-900">
+                            {d.promedioFestivoDia !== null
+                              ? `${formatoMonedaCorta(d.promedioFestivoDia)} (${d.cantidadFestivos})`
+                              : "Sin festivos en el período"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 {festivosDetalle.length > 0 && (
                   <ul className="mt-3 space-y-1 text-xs text-gray-500">
                     {festivosDetalle.map((f) => (
@@ -672,7 +781,7 @@ export default async function InsightsPage({
           <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Margen por producto</h3>
-              {rango && <VariacionBadge actual={utilidadNetaActual} anterior={utilidadAnteriorTotal} />}
+              {hayComparacion && <VariacionBadge actual={utilidadNetaActual} anterior={utilidadAnteriorTotal} />}
             </div>
             {barrasMargen.length === 0 ? (
               <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
@@ -742,5 +851,18 @@ export default async function InsightsPage({
         )}
       </div>
     </div>
+  );
+}
+
+export default async function InsightsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ periodo?: string; desde?: string; hasta?: string; dia_semana?: string; producto?: string }>;
+}) {
+  const params = await searchParams;
+  return (
+    <Suspense fallback={<p className="text-sm text-gray-400">Cargando…</p>}>
+      <ContenidoInsights searchParams={params} />
+    </Suspense>
   );
 }
