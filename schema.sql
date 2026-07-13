@@ -739,11 +739,16 @@ insert into festivos (fecha, nombre) values
 
 -- Vista: ventas por día, marcando día de la semana y si fue festivo.
 -- Responde directo "¿vendemos más los festivos?" — se filtra o agrupa por es_festivo.
+-- "at time zone 'America/Bogota'" convierte la marca de tiempo (guardada en
+-- UTC) a la hora real de Colombia antes de truncarla a un día — si no, una
+-- venta después de las 7pm (Colombia) quedaba contada como del día
+-- siguiente en UTC, y por eso podía no coincidir con el festivo real ni con
+-- el día de la semana correcto.
 create or replace view vista_ventas_por_dia as
 select
   v.empresa_id,
-  v.fecha::date as dia,
-  case extract(dow from v.fecha::date)::int
+  (v.fecha at time zone 'America/Bogota')::date as dia,
+  case extract(dow from (v.fecha at time zone 'America/Bogota')::date)::int
     when 0 then 'Domingo' when 1 then 'Lunes' when 2 then 'Martes'
     when 3 then 'Miércoles' when 4 then 'Jueves' when 5 then 'Viernes'
     when 6 then 'Sábado'
@@ -753,8 +758,8 @@ select
   count(v.id) as numero_ventas,
   sum(v.monto) as total_vendido
 from ventas v
-left join festivos f on f.fecha = v.fecha::date
-group by v.empresa_id, v.fecha::date, f.fecha, f.nombre;
+left join festivos f on f.fecha = (v.fecha at time zone 'America/Bogota')::date
+group by v.empresa_id, (v.fecha at time zone 'America/Bogota')::date, f.fecha, f.nombre;
 
 -- ------------------------------------------------------------
 -- Vista: Perfil de compra de un cliente

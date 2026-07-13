@@ -108,17 +108,27 @@ function sumarDiasIso(fecha: string, dias: number) {
   return d.toISOString().slice(0, 10);
 }
 
+// Colombia no tiene horario de verano — el desfase con UTC siempre es -5.
+// Una venta guardada en UTC después de las 7pm hora Colombia cae en el día
+// siguiente si no se corrige esto antes de truncar a fecha — por eso el día,
+// el día de la semana y si fue festivo se calculan sobre la hora Colombia,
+// no sobre la hora UTC cruda.
+function fechaColombia(fechaIso: string): { diaStr: string; hora: number } {
+  const utc = new Date(fechaIso);
+  const horaUtc = utc.getUTCHours();
+  const hora = (horaUtc + 24 - 5) % 24;
+  const colombia = new Date(utc.getTime() - 5 * 60 * 60 * 1000);
+  return { diaStr: colombia.toISOString().slice(0, 10), hora };
+}
+
 function aplanarFilas(filas: FilaVentaItemRaw[], festivosSet: Set<string>): FilaUnificada[] {
   const resultado: FilaUnificada[] = [];
   for (const f of filas) {
     const v = Array.isArray(f.ventas) ? f.ventas[0] : f.ventas;
     const item = Array.isArray(f.inventario_items) ? f.inventario_items[0] : f.inventario_items;
     if (!v?.fecha || !item) continue;
-    const diaStr = v.fecha.slice(0, 10);
+    const { diaStr, hora } = fechaColombia(v.fecha);
     const diaSemana = NOMBRE_DIA[new Date(`${diaStr}T00:00:00Z`).getUTCDay()];
-    // Colombia no tiene horario de verano — el desfase con UTC siempre es -5.
-    const horaUtc = new Date(v.fecha).getUTCHours();
-    const hora = (horaUtc + 24 - 5) % 24;
     resultado.push({
       diaStr,
       diaSemana,
