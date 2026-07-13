@@ -1,10 +1,17 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { primeraMayuscula } from "@/lib/texto";
 import { calcularRango, type Periodo } from "@/lib/periodos";
-import { GraficoBarras, GraficoBarrasHorizontal, GraficoLinea, type Barra, type PuntoLinea } from "./graficos";
+import {
+  GraficoBarras,
+  GraficoBarrasHorizontal,
+  GraficoBarrasAgrupadas,
+  GraficoLinea,
+  type Barra,
+  type BarraAgrupada,
+  type PuntoLinea,
+} from "./graficos";
 import { FiltroFecha } from "./filtro-fecha";
 import { VariacionBadge } from "./variacion";
 
@@ -417,6 +424,14 @@ async function ContenidoInsights({
     return { dia, promedioNormalDia, promedioFestivoDia, cantidadFestivos: festivosDia.length };
   });
 
+  const barrasAgrupadasFestivos: BarraAgrupada[] = festivosPorDiaSemana.map((d) => ({
+    etiqueta: ABREVIATURA_DIA[d.dia],
+    valorA: d.promedioNormalDia ?? 0,
+    textoA: d.promedioNormalDia !== null ? formatoMonedaCorta(d.promedioNormalDia) : "",
+    valorB: d.promedioFestivoDia,
+    textoB: d.promedioFestivoDia !== null ? formatoMonedaCorta(d.promedioFestivoDia) : "",
+  }));
+
   const festivos = ventasPorDia.filter((f) => f.es_festivo);
   const noFestivos = ventasPorDia.filter((f) => !f.es_festivo);
   const promedioFestivo =
@@ -732,46 +747,7 @@ async function ContenidoInsights({
               <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
             ) : (
               <>
-                <GraficoBarras
-                  datos={[
-                    {
-                      etiqueta: "Normal",
-                      valor: promedioNoFestivo ?? 0,
-                      textoValor: promedioNoFestivo !== null ? formatoMonedaCorta(promedioNoFestivo) : "Sin datos",
-                    },
-                    {
-                      etiqueta: "Festivo",
-                      valor: promedioFestivo ?? 0,
-                      textoValor: promedioFestivo !== null ? formatoMonedaCorta(promedioFestivo) : "Sin datos",
-                    },
-                  ]}
-                />
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="text-gray-400">
-                        <th className="pb-1 font-medium">Día</th>
-                        <th className="pb-1 font-medium">Normal</th>
-                        <th className="pb-1 font-medium">Festivo</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {festivosPorDiaSemana.map((d) => (
-                        <tr key={d.dia}>
-                          <td className="py-1 text-gray-700">{d.dia}</td>
-                          <td className="py-1 text-gray-900">
-                            {d.promedioNormalDia !== null ? formatoMonedaCorta(d.promedioNormalDia) : "—"}
-                          </td>
-                          <td className="py-1 text-gray-900">
-                            {d.promedioFestivoDia !== null
-                              ? `${formatoMonedaCorta(d.promedioFestivoDia)} (${d.cantidadFestivos})`
-                              : "Sin festivos en el período"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
                 {festivosDetalle.length > 0 && (
                   <ul className="mt-3 space-y-1 text-xs text-gray-500">
                     {festivosDetalle.map((f) => (
@@ -800,43 +776,6 @@ async function ContenidoInsights({
             )}
           </div>
 
-          {porProducto.length > 0 && (
-            <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
-              <h3 className="mb-3 text-xs font-medium text-gray-700">Detalle por producto</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="text-xs text-gray-400">
-                      <th className="pb-2 font-medium">Producto</th>
-                      <th className="pb-2 font-medium">Ingresos</th>
-                      <th className="pb-2 font-medium">Utilidad</th>
-                      <th className="pb-2 font-medium">Margen</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {[...porProducto]
-                      .sort((a, b) => b.ingresos - a.ingresos)
-                      .map((p) => (
-                        <tr key={p.item_id}>
-                          <td className="py-2 text-gray-900">
-                            <Link href={`/inventario/${p.item_id}`} className="hover:underline">
-                              {p.nombre}
-                            </Link>
-                          </td>
-                          <td className="py-2 text-gray-700">{formatoMoneda(p.ingresos)}</td>
-                          <td className="py-2 text-gray-700">{formatoMoneda(p.utilidad)}</td>
-                          <td
-                            className={`py-2 ${p.margen_porcentaje < UMBRAL_MARGEN_BAJO ? "text-red-600" : "text-gray-700"}`}
-                          >
-                            {p.margen_porcentaje}%
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

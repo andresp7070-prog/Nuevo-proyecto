@@ -253,3 +253,123 @@ export function GraficoBarrasHorizontal({ datos }: { datos: Barra[] }) {
     </div>
   );
 }
+
+export type BarraAgrupada = {
+  etiqueta: string;
+  valorA: number;
+  textoA: string;
+  // null = no hay dato para esa categoría (ej. ese día de la semana no tuvo
+  // ningún festivo en el período) — no se dibuja ninguna barra, en vez de
+  // dibujar una barra en cero.
+  valorB: number | null;
+  textoB: string;
+};
+
+export function GraficoBarrasAgrupadas({
+  datos,
+  leyendaA,
+  leyendaB,
+  colorA = "#1a1b33",
+  colorB = "#9c6900",
+  alto = 170,
+}: {
+  datos: BarraAgrupada[];
+  leyendaA: string;
+  leyendaB: string;
+  colorA?: string;
+  colorB?: string;
+  alto?: number;
+}) {
+  const [hover, setHover] = useState<string | null>(null);
+
+  if (datos.length === 0) return null;
+
+  const anchoBarra = 18;
+  const espacioBarras = 3;
+  const espacioGrupo = 22;
+  const grupoAncho = anchoBarra * 2 + espacioBarras;
+  const ancho = datos.length * (grupoAncho + espacioGrupo) + espacioGrupo;
+  const maxAbs = Math.max(1, ...datos.map((d) => Math.max(d.valorA, d.valorB ?? 0)));
+  const baseY = alto - 8;
+  const escala = (alto - 8 - 28) / maxAbs;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: colorA }} />
+          {leyendaA}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: colorB }} />
+          {leyendaB}
+        </span>
+      </div>
+      <div className="flex justify-center overflow-x-auto">
+        <svg width={ancho} height={alto + 24} role="img" aria-label="Gráfico de barras agrupadas">
+          <line x1={0} y1={baseY} x2={ancho} y2={baseY} stroke="#c3c2b7" strokeWidth={1} />
+          {datos.map((d, i) => {
+            const xGrupo = espacioGrupo + i * (grupoAncho + espacioGrupo);
+            const hA = d.valorA > 0 ? Math.max(d.valorA * escala, 2) : 0;
+            const yA = baseY - hA;
+            const hB = d.valorB !== null && d.valorB > 0 ? Math.max(d.valorB * escala, 2) : 0;
+            const yB = baseY - hB;
+            const xB = xGrupo + anchoBarra + espacioBarras;
+
+            return (
+              <g key={i}>
+                <rect
+                  x={xGrupo}
+                  y={yA}
+                  width={anchoBarra}
+                  height={hA}
+                  rx={3}
+                  fill={colorA}
+                  opacity={hover === `${i}a` ? 1 : 0.85}
+                  onMouseEnter={() => setHover(`${i}a`)}
+                  onMouseLeave={() => setHover(null)}
+                  className="cursor-default"
+                />
+                {hA > 0 && (
+                  <text x={xGrupo + anchoBarra / 2} y={yA - 4} textAnchor="middle" fontSize={9} fill="#52514e">
+                    {d.textoA}
+                  </text>
+                )}
+                {d.valorB !== null && (
+                  <>
+                    <rect
+                      x={xB}
+                      y={yB}
+                      width={anchoBarra}
+                      height={hB}
+                      rx={3}
+                      fill={colorB}
+                      opacity={hover === `${i}b` ? 1 : 0.85}
+                      onMouseEnter={() => setHover(`${i}b`)}
+                      onMouseLeave={() => setHover(null)}
+                      className="cursor-default"
+                    />
+                    {hB > 0 && (
+                      <text x={xB + anchoBarra / 2} y={yB - 4} textAnchor="middle" fontSize={9} fill="#52514e">
+                        {d.textoB}
+                      </text>
+                    )}
+                  </>
+                )}
+                <text
+                  x={xGrupo + grupoAncho / 2}
+                  y={alto + 18}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fill="#898781"
+                >
+                  {d.etiqueta}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
