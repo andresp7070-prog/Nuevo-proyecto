@@ -56,3 +56,17 @@ export function calcularDiasRestantes(
   if (!unidadesPorDia || unidadesPorDia <= 0) return null;
   return Math.floor(cantidad / unidadesPorDia);
 }
+
+// Promedio de días entre una venta de este producto y la siguiente — "cada
+// cuánto se vende", sin importar cuántas unidades salieron cada vez (a
+// diferencia de vista_velocidad_ventas, que mide unidades por día). null =
+// no hay al menos dos ventas distintas para calcular un intervalo.
+export function promedioDiasEntreVentas(fechasVentaMs: number[]): number | null {
+  if (fechasVentaMs.length < 2) return null;
+  const ordenadas = [...fechasVentaMs].sort((a, b) => a - b);
+  let sumaDias = 0;
+  for (let i = 1; i < ordenadas.length; i++) {
+    sumaDias += (ordenadas[i] - ordenadas[i - 1]) / (1000 * 60 * 60 * 24);
+  }
+  return sumaDias / (ordenadas.length - 1);
+}
