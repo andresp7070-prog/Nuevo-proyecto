@@ -15,10 +15,28 @@ function formatoMoneda(valor: number) {
   return valor.toLocaleString("es-CO", { style: "currency", currency: "COP" });
 }
 
+function formatoBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const unidades = ["KB", "MB", "GB", "TB"];
+  let valor = bytes;
+  let i = -1;
+  do {
+    valor /= 1024;
+    i++;
+  } while (valor >= 1024 && i < unidades.length - 1);
+  return `${valor.toFixed(1)} ${unidades[i]}`;
+}
+
 // Medianoche del primer día del mes, en hora Colombia (UTC-5) convertida a UTC.
 function primerDiaMesColombiaISO(): string {
   const hoyColombia = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
   return `${hoyColombia.slice(0, 7)}-01T05:00:00.000Z`;
+}
+
+// Medianoche del 1 de enero del año actual, en hora Colombia (UTC-5) convertida a UTC.
+function primerDiaAnioColombiaISO(): string {
+  const hoyColombia = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  return `${hoyColombia.slice(0, 4)}-01-01T05:00:00.000Z`;
 }
 
 export default async function AdminDashboardPage() {
@@ -26,20 +44,30 @@ export default async function AdminDashboardPage() {
   const supabase = await createClient();
 
   const inicioMesIso = primerDiaMesColombiaISO();
+  const inicioAnioIso = primerDiaAnioColombiaISO();
   const hace30DiasIso = new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: empresas }, { data: ventasMes }, { data: ventasRecientes }] = await Promise.all([
+  const [
+    { data: empresas },
+    { data: ventasMes },
+    { data: ventasAnio },
+    { data: ventasRecientes },
+    { data: tamanoBd },
+  ] = await Promise.all([
     supabase
       .from("empresas")
       .select("id, nombre, tipo_negocio, modulos_activos, created_at")
       .order("created_at", { ascending: false }),
     supabase.from("ventas").select("monto").gte("fecha", inicioMesIso),
+    supabase.from("ventas").select("monto").gte("fecha", inicioAnioIso),
     supabase.from("ventas").select("empresa_id").gte("fecha", hace30DiasIso),
+    supabase.rpc("tamano_base_datos"),
   ]);
 
   const listaEmpresas = empresas ?? [];
   const totalEmpresas = listaEmpresas.length;
   const totalVentasMes = (ventasMes ?? []).reduce((suma, v) => suma + Number(v.monto), 0);
+  const totalVentasAnio = (ventasAnio ?? []).reduce((suma, v) => suma + Number(v.monto), 0);
   const empresasActivas = new Set((ventasRecientes ?? []).map((v) => v.empresa_id)).size;
 
   const conteoModulos: Record<string, number> = {};
@@ -75,6 +103,31 @@ export default async function AdminDashboardPage() {
         <div className="rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-400">Ventas del mes (todas las empresas)</p>
           <p className="mt-1 text-2xl font-semibold text-gray-900">{formatoMoneda(totalVentasMes)}</p>
+          <p className="mt-1 text-xs text-gray-400">
+            {formatoMoneda(totalVentasAnio)} en total este año
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 p-4">
+        <h2 className="mb-3 text-sm font-semibold text-gray-900">Uso de la plataforma</h2>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-xs text-gray-400">Base de datos (Supabase)</p>
+            <p className="mt-1 text-lg font-semibold text-gray-900">
+              {tamanoBd !== null && tamanoBd !== undefined ? formatoBytes(Number(tamanoBd)) : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Ancho de banda (Vercel)</p>
+            <p className="mt-1 text-lg font-semibold text-gray-300">Pendiente</p>
+            <p className="mt-1 text-xs text-gray-400">Requiere plan Pro de Vercel</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Almacenamiento de archivos (Supabase)</p>
+            <p className="mt-1 text-lg font-semibold text-gray-300">Pendiente</p>
+            <p className="mt-1 text-xs text-gray-400">Falta conectar la API de Supabase</p>
+          </div>
         </div>
       </div>
 
