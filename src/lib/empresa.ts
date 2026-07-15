@@ -57,10 +57,20 @@ export async function requerirModulo(modulo: string) {
   }
 }
 
-// Bloquea el acceso a pantallas exclusivas del administrador.
+// Bloquea el acceso al panel de administrador y sus pantallas (reporte
+// global, enviar bienvenida) a exactamente una cuenta — la de Andrés,
+// identificada por su id de usuario en SUPER_ADMIN_USER_ID. No basta con
+// tener rol = 'admin': si en el futuro existe otra cuenta con ese rol, esta
+// función igual la bloquea. Es intencional — este panel ve datos de todas
+// las empresas cliente juntas, y debe quedar exclusivo de una sola persona.
 export async function requerirAdmin() {
-  const perfil = await getPerfilActual();
-  if (perfil?.rol !== "admin") {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const superAdminId = process.env.SUPER_ADMIN_USER_ID;
+  if (!user || !superAdminId || user.id !== superAdminId) {
     redirect("/resumen");
   }
 }
