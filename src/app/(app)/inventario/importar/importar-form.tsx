@@ -4,22 +4,54 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parsearCsv } from "@/lib/csv";
 import { sinTildes } from "@/lib/texto";
+import { normalizarUnidad, etiquetaUnidad } from "@/lib/unidades";
 import { DescargarCsv } from "@/components/descargar-csv";
 import { cargarInventarioInicial, type FilaImportacion } from "./actions";
 
-const COLUMNAS_ESPERADAS = ["nombre", "categoria", "unidad", "cantidad", "costo", "precio_venta"];
+const COLUMNAS_ESPERADAS = [
+  "nombre",
+  "categoria",
+  "unidad",
+  "cantidad",
+  "costo",
+  "precio_venta",
+  "es_insumo",
+];
+
+const VALORES_SI = ["si", "s", "sí", "yes", "y", "x", "1", "true"];
+const VALORES_NO = ["no", "n", "0", "false"];
+
+type FilaPreview = FilaImportacion & {
+  unidadOriginal: string;
+  unidadReconocida: boolean;
+  esInsumoOriginal: string;
+  esInsumoReconocido: boolean;
+  errores: string[];
+};
 
 function normalizarEncabezado(valor: string) {
   return sinTildes(valor.trim());
+}
+
+// "es_insumo" viene como texto libre (si/no) en el CSV — reconoce las formas
+// comunes de escribirlo; si no reconoce nada, asume que no es insumo pero lo
+// marca como error para que la persona lo revise en la vista previa.
+function normalizarSiNo(textoLibre: string): { valor: boolean; reconocida: boolean } {
+  const limpio = sinTildes(textoLibre.trim());
+  if (!limpio) return { valor: false, reconocida: true };
+  if (VALORES_SI.includes(limpio)) return { valor: true, reconocida: true };
+  if (VALORES_NO.includes(limpio)) return { valor: false, reconocida: true };
+  return { valor: false, reconocida: false };
 }
 
 export function ImportarInventarioForm() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [filas, setFilas] = useState<FilaImportacion[]>([]);
+  const [filas, setFilas] = useState<FilaPreview[]>([]);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
   const [nombreArchivo, setNombreArchivo] = useState<string | null>(null);
+  const [reemplazar, setReemplazar] = useState(false);
 
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,20 +96,56 @@ export function ImportarInventarioForm() {
 
       const indice = Object.fromEntries(COLUMNAS_ESPERADAS.map((c) => [c, encabezado.indexOf(c)]));
 
-      const filasParseadas: FilaImportacion[] = filasCrudas
-        .slice(1)
-        .map((fila) => ({
-          nombre: (fila[indice.nombre] ?? "").trim(),
+      const filasParseadas: FilaPreview[] = filasCrudas.slice(1).map((fila) => {
+        const nombre = (fila[indice.nombre] ?? "").trim();
+        const unidadOriginal = (fila[indice.unidad] ?? "").trim();
+        const { valor: unidad, reconocida: unidadReconocida } = normalizarUnidad(unidadOriginal);
+
+        const cantidadCruda = (fila[indice.cantidad] ?? "").trim();
+        const costoCrudo = (fila[indice.costo] ?? "").trim();
+        const precioCrudo = (fila[indice.precio_venta] ?? "").trim();
+        const esInsumoOriginal = (fila[indice.es_insumo] ?? "").trim();
+        const { valor: esInsumo, reconocida: esInsumoReconocido } = normalizarSiNo(esInsumoOriginal);
+
+        const errores: string[] = [];
+        if (!nombre) errores.push("Falta el nombre del producto");
+        if (unidadOriginal && !unidadReconocida) {
+          errores.push(`Unidad "${unidadOriginal}" no reconocida, se guarda como Unidades`);
+        }
+        if (cantidadCruda && Number.isNaN(Number(cantidadCruda))) {
+          errores.push(`Cantidad "${cantidadCruda}" no es un número válido, se guarda como 0`);
+        }
+        if (costoCrudo && Number.isNaN(Number(costoCrudo))) {
+          errores.push(`Costo "${costoCrudo}" no es un número válido, se guarda como 0`);
+        }
+        if (precioCrudo && Number.isNaN(Number(precioCrudo))) {
+          errores.push(`Precio de venta "${precioCrudo}" no es un número válido, se guarda como 0`);
+        }
+        if (!esInsumoReconocido) {
+          errores.push(`"es_insumo" con valor "${esInsumoOriginal}" no reconocido, se guarda como No`);
+        }
+        if (esInsumo && precioCrudo && Number(precioCrudo) > 0) {
+          errores.push(`Tiene precio de venta pero está marcado como insumo — se guarda sin precio de venta`);
+        }
+
+        return {
+          nombre,
           categoria: (fila[indice.categoria] ?? "").trim(),
-          unidad: (fila[indice.unidad] ?? "").trim(),
-          cantidad: Number(fila[indice.cantidad]) || 0,
-          costo: Number(fila[indice.costo]) || 0,
-          precioVenta: Number(fila[indice.precio_venta]) || 0,
-        }))
-        .filter((fila) => fila.nombre !== "");
+          unidad,
+          unidadOriginal,
+          unidadReconocida,
+          cantidad: Number(cantidadCruda) || 0,
+          costo: Number(costoCrudo) || 0,
+          precioVenta: Number(precioCrudo) || 0,
+          esInsumo,
+          esInsumoOriginal,
+          esInsumoReconocido,
+          errores,
+        };
+      });
 
       if (filasParseadas.length === 0) {
-        setErrorArchivo("No se encontró ninguna fila con nombre de producto.");
+        setErrorArchivo("El archivo no tiene filas de datos.");
         setFilas([]);
         return;
       }
@@ -93,7 +161,8 @@ export function ImportarInventarioForm() {
     setError(null);
     setCargando(true);
     try {
-      const resultado = await cargarInventarioInicial(filas);
+      const filasValidas = filas.filter((fila) => fila.nombre !== "");
+      const resultado = await cargarInventarioInicial(filasValidas, reemplazar);
       if (resultado.error) {
         setError(resultado.error);
         return;
@@ -108,6 +177,9 @@ export function ImportarInventarioForm() {
     }
   }
 
+  const filasConError = filas.filter((fila) => fila.errores.length > 0);
+  const filasValidas = filas.filter((fila) => fila.nombre !== "");
+
   return (
     <div className="max-w-2xl">
       <div className="mb-6 flex items-center justify-between">
@@ -121,6 +193,7 @@ export function ImportarInventarioForm() {
               cantidad: 50,
               costo: 3500,
               precio_venta: 6000,
+              es_insumo: "no",
             },
           ]}
           columnas={[
@@ -130,6 +203,7 @@ export function ImportarInventarioForm() {
             { clave: "cantidad", titulo: "cantidad" },
             { clave: "costo", titulo: "costo" },
             { clave: "precio_venta", titulo: "precio_venta" },
+            { clave: "es_insumo", titulo: "es_insumo" },
           ]}
           nombreArchivo="plantilla-inventario.csv"
         />
@@ -144,10 +218,55 @@ export function ImportarInventarioForm() {
         <p className="mb-1">
           2. Súbela aquí abajo — vas a ver una vista previa antes de confirmar nada.
         </p>
-        <p>
-          3. Si un producto ya existe (mismo nombre), le suma la cantidad y actualiza costo y
-          precio; si no existe, lo crea.
+        <p className="mb-1">
+          3. Si no existe, lo crea. Si un producto ya existe (mismo nombre), lo que pase con la
+          cantidad depende del modo que elijas abajo.
         </p>
+        <p className="mb-1">
+          En &quot;unidad&quot; puedes escribir como te salga natural — <em>kg, kilo, litro, lt, ml, libra,
+          galón, unidad</em> — el sistema reconoce las formas comunes (con o sin tilde, mayúscula
+          o minúscula). Si algo no lo reconoce, te avisa en la vista previa antes de confirmar.
+        </p>
+        <p>
+          &quot;es_insumo&quot; es <em>si</em> o <em>no</em>: los insumos son materiales de receta que no
+          se venden solos (no tienen precio de venta) — si marcas &quot;si&quot; y además le pones
+          precio de venta, la vista previa lo marca como error porque no tiene lógica.
+        </p>
+      </div>
+
+      <div className="mb-4 rounded-xl border border-gray-200 p-4">
+        <p className="mb-2 text-sm font-medium text-gray-900">
+          Si un producto del archivo ya existe, ¿qué hacemos con la cantidad?
+        </p>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="modo-carga"
+              checked={!reemplazar}
+              onChange={() => setReemplazar(false)}
+              className="mt-0.5"
+            />
+            <span>
+              <strong>Sumar</strong> a la cantidad que ya hay — para reabastecimientos normales.
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="modo-carga"
+              checked={reemplazar}
+              onChange={() => setReemplazar(true)}
+              className="mt-0.5"
+            />
+            <span>
+              <strong>Reemplazar</strong> la cantidad por la del archivo — para la carga inicial o
+              un recuento completo. Si el mismo producto aparece en dos filas con costos
+              distintos, la cantidad de ambas se suma, pero se guardan como dos lotes separados
+              (no se pierde el detalle de a qué costo entró cada uno).
+            </span>
+          </label>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -170,9 +289,46 @@ export function ImportarInventarioForm() {
 
       {filas.length > 0 && (
         <div className="mb-6">
-          <p className="mb-2 text-sm font-medium text-gray-900">
-            Vista previa ({filas.length} producto{filas.length === 1 ? "" : "s"})
-          </p>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-gray-900">
+              Vista previa ({filas.length} fila{filas.length === 1 ? "" : "s"})
+            </p>
+            {filasConError.length > 0 && (
+              <DescargarCsv
+                etiqueta="Descargar archivo con errores"
+                filas={filas.map((fila) => ({
+                  nombre: fila.nombre,
+                  categoria: fila.categoria,
+                  unidad: fila.unidadOriginal || fila.unidad,
+                  cantidad: fila.cantidad,
+                  costo: fila.costo,
+                  precio_venta: fila.precioVenta,
+                  es_insumo: fila.esInsumoOriginal || (fila.esInsumo ? "si" : "no"),
+                  error: fila.errores.join(" / "),
+                }))}
+                columnas={[
+                  { clave: "nombre", titulo: "nombre" },
+                  { clave: "categoria", titulo: "categoria" },
+                  { clave: "unidad", titulo: "unidad" },
+                  { clave: "cantidad", titulo: "cantidad" },
+                  { clave: "costo", titulo: "costo" },
+                  { clave: "precio_venta", titulo: "precio_venta" },
+                  { clave: "es_insumo", titulo: "es_insumo" },
+                  { clave: "error", titulo: "error" },
+                ]}
+                nombreArchivo="inventario-con-errores.csv"
+              />
+            )}
+          </div>
+          {filasConError.length > 0 && (
+            <p className="mb-2 text-xs text-amber-600">
+              {filasConError.length} fila{filasConError.length === 1 ? "" : "s"} tienen algún
+              problema (columna &quot;Error&quot; abajo). Descarga el archivo de arriba para verlos todos
+              con el detalle, corrígelos en tu CSV original y vuelve a subirlo. Las filas sin
+              nombre de producto no se importan; el resto sí se importa, usando el valor por
+              defecto que se indica en cada caso.
+            </p>
+          )}
           <div className="max-h-80 overflow-y-auto rounded-xl border border-gray-200">
             <table className="w-full text-left text-sm">
               <thead className="sticky top-0 bg-gray-50 text-xs text-gray-400">
@@ -183,17 +339,25 @@ export function ImportarInventarioForm() {
                   <th className="px-3 py-2">Cantidad</th>
                   <th className="px-3 py-2">Costo</th>
                   <th className="px-3 py-2">Precio venta</th>
+                  <th className="px-3 py-2">Insumo</th>
+                  <th className="px-3 py-2">Error</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filas.map((fila, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2 text-gray-900">{fila.nombre}</td>
+                  <tr key={i} className={fila.errores.length > 0 ? "bg-amber-50" : undefined}>
+                    <td className="px-3 py-2 text-gray-900">{fila.nombre || "—"}</td>
                     <td className="px-3 py-2 text-gray-500">{fila.categoria || "—"}</td>
-                    <td className="px-3 py-2 text-gray-500">{fila.unidad || "unidad"}</td>
+                    <td className="px-3 py-2 text-gray-500">{etiquetaUnidad(fila.unidad)}</td>
                     <td className="px-3 py-2 text-gray-500">{fila.cantidad}</td>
                     <td className="px-3 py-2 text-gray-500">{fila.costo}</td>
-                    <td className="px-3 py-2 text-gray-500">{fila.precioVenta}</td>
+                    <td className="px-3 py-2 text-gray-500">
+                      {fila.esInsumo ? "—" : fila.precioVenta}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">{fila.esInsumo ? "Sí" : "No"}</td>
+                    <td className="px-3 py-2 text-amber-600">
+                      {fila.errores.length > 0 ? fila.errores.join(" / ") : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -204,10 +368,10 @@ export function ImportarInventarioForm() {
             <button
               type="button"
               onClick={confirmar}
-              disabled={cargando}
+              disabled={cargando || filasValidas.length === 0}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
             >
-              {cargando ? "Importando..." : `Confirmar carga de ${filas.length} producto(s)`}
+              {cargando ? "Importando..." : `Confirmar carga de ${filasValidas.length} producto(s)`}
             </button>
             <button
               type="button"

@@ -7,6 +7,10 @@ export type Barra = {
   valor: number;
   textoValor: string;
   tono?: "default" | "positivo" | "negativo" | "alerta";
+  // Si viene, la barra se puede hacer clic y navega ahí — así se arma un
+  // filtro (por mes, por día de la semana, por producto...) haciendo clic
+  // directo en la gráfica, sumándose a cualquier otro filtro ya activo.
+  enlace?: string;
 };
 
 const COLOR: Record<NonNullable<Barra["tono"]>, string> = {
@@ -40,13 +44,12 @@ export function GraficoBarras({
   const escala = (hayNegativos ? alto / 2 - 20 : alto - 8 - 20) / maxAbs;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="flex justify-center overflow-x-auto">
       <svg
         width={ancho}
         height={alto + 24}
         role="img"
         aria-label="Gráfico de barras"
-        className="min-w-full"
       >
         <line x1={0} y1={baseY} x2={ancho} y2={baseY} stroke="#c3c2b7" strokeWidth={1} />
         {datos.map((d, i) => {
@@ -55,12 +58,11 @@ export function GraficoBarras({
           const y = d.valor >= 0 ? baseY - h : baseY;
           const color = COLOR[d.tono ?? tonoAutomatico(d.valor)];
           const activo = hover === i;
-          return (
+          const contenido = (
             <g
-              key={i}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
-              className="cursor-default"
+              className={d.enlace ? "cursor-pointer" : "cursor-default"}
             >
               <rect
                 x={x}
@@ -85,11 +87,19 @@ export function GraficoBarras({
                 y={alto + 18}
                 textAnchor="middle"
                 fontSize={11}
-                fill="#898781"
+                fill={d.enlace ? color : "#898781"}
+                textDecoration={d.enlace ? "underline" : undefined}
               >
                 {d.etiqueta}
               </text>
             </g>
+          );
+          return d.enlace ? (
+            <a key={i} href={d.enlace} aria-label={`Filtrar por ${d.etiqueta}`}>
+              {contenido}
+            </a>
+          ) : (
+            <g key={i}>{contenido}</g>
           );
         })}
       </svg>
@@ -104,12 +114,35 @@ export type PuntoLinea = {
   mostrarEtiqueta?: boolean;
 };
 
+// Curva suave que pasa por todos los puntos (Catmull-Rom convertida a
+// Bézier cúbica), en vez de segmentos rectos entre cada punto.
+function trazoSuave(coords: { x: number; y: number }[]) {
+  if (coords.length < 2) return coords.length === 1 ? `M${coords[0].x},${coords[0].y}` : "";
+  let d = `M${coords[0].x.toFixed(1)},${coords[0].y.toFixed(1)}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[i === 0 ? i : i - 1];
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    const p3 = coords[i + 2 < coords.length ? i + 2 : i + 1];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
 export function GraficoLinea({
   puntos,
   alto = 160,
+  compacto = false,
 }: {
   puntos: PuntoLinea[];
   alto?: number;
+  // En modo compacto, todos los puntos se ajustan al ancho disponible
+  // (sin barra de desplazamiento) en vez de crecer con la cantidad de datos.
+  compacto?: boolean;
 }) {
   const [hover, setHover] = useState<number | null>(null);
 
@@ -117,26 +150,30 @@ export function GraficoLinea({
 
   const pasoX = 28;
   const margen = 16;
-  const ancho = (puntos.length - 1) * pasoX + margen * 2;
+  const anchoNatural = (puntos.length - 1) * pasoX + margen * 2;
+  const ancho = compacto ? 480 : anchoNatural;
   const ejeY = alto - 24;
   const max = Math.max(1, ...puntos.map((p) => p.valor));
   const escala = (ejeY - 16) / max;
+  const pasoXCompacto = (ancho - margen * 2) / Math.max(1, puntos.length - 1);
 
   const coords = puntos.map((p, i) => ({
-    x: margen + i * pasoX,
+    x: margen + i * (compacto ? pasoXCompacto : pasoX),
     y: ejeY - p.valor * escala,
   }));
 
-  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+  const path = trazoSuave(coords);
 
   return (
-    <div className="overflow-x-auto">
+    <div className={compacto ? "flex justify-center" : "flex justify-center overflow-x-auto"}>
       <svg
-        width={ancho}
+        viewBox={compacto ? `0 0 ${ancho} ${alto}` : undefined}
+        width={compacto ? "100%" : ancho}
         height={alto}
+        preserveAspectRatio={compacto ? "none" : undefined}
+        style={compacto ? { maxWidth: ancho } : undefined}
         role="img"
         aria-label="Gráfico de línea"
-        className="min-w-full"
       >
         <line x1={margen} y1={ejeY} x2={ancho - margen} y2={ejeY} stroke="#e1e0d9" strokeWidth={1} />
         <path d={path} fill="none" stroke="#1a1b33" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -147,7 +184,13 @@ export function GraficoLinea({
             onMouseLeave={() => setHover(null)}
             className="cursor-default"
           >
-            <rect x={c.x - pasoX / 2} y={0} width={pasoX} height={alto} fill="transparent" />
+            <rect
+              x={c.x - (compacto ? pasoXCompacto : pasoX) / 2}
+              y={0}
+              width={compacto ? pasoXCompacto : pasoX}
+              height={alto}
+              fill="transparent"
+            />
             <circle cx={c.x} cy={c.y} r={hover === i ? 5 : 3} fill="#1a1b33" />
             {puntos[i].mostrarEtiqueta && (
               <text x={c.x} y={alto - 6} textAnchor="middle" fontSize={10} fill="#898781">
@@ -194,14 +237,19 @@ export function GraficoBarrasHorizontal({ datos }: { datos: Barra[] }) {
       {datos.map((d, i) => {
         const ancho = (Math.abs(d.valor) / maxAbs) * 100;
         const color = COLOR[d.tono ?? tonoAutomatico(d.valor)];
+        const Elemento = d.enlace ? "a" : "div";
         return (
-          <div
+          <Elemento
             key={i}
-            className="flex items-center gap-2 text-xs"
+            {...(d.enlace ? { href: d.enlace, "aria-label": `Filtrar por ${d.etiqueta}` } : {})}
+            className={`flex items-center gap-2 text-xs ${d.enlace ? "cursor-pointer hover:opacity-80" : ""}`}
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover(null)}
           >
-            <span className="w-36 shrink-0 truncate text-gray-600" title={d.etiqueta}>
+            <span
+              className={`w-36 shrink-0 truncate ${d.enlace ? "text-gray-900 underline" : "text-gray-600"}`}
+              title={d.etiqueta}
+            >
               {d.etiqueta}
             </span>
             <div className="h-4 flex-1 rounded-lg bg-gray-100">
@@ -215,9 +263,129 @@ export function GraficoBarrasHorizontal({ datos }: { datos: Barra[] }) {
               />
             </div>
             <span className="w-20 shrink-0 text-right text-gray-700">{d.textoValor}</span>
-          </div>
+          </Elemento>
         );
       })}
+    </div>
+  );
+}
+
+export type BarraAgrupada = {
+  etiqueta: string;
+  valorA: number;
+  textoA: string;
+  // null = no hay dato para esa categoría (ej. ese día de la semana no tuvo
+  // ningún festivo en el período) — no se dibuja ninguna barra, en vez de
+  // dibujar una barra en cero.
+  valorB: number | null;
+  textoB: string;
+};
+
+export function GraficoBarrasAgrupadas({
+  datos,
+  leyendaA,
+  leyendaB,
+  colorA = "#1a1b33",
+  colorB = "#9c6900",
+  alto = 170,
+}: {
+  datos: BarraAgrupada[];
+  leyendaA: string;
+  leyendaB: string;
+  colorA?: string;
+  colorB?: string;
+  alto?: number;
+}) {
+  const [hover, setHover] = useState<string | null>(null);
+
+  if (datos.length === 0) return null;
+
+  const anchoBarra = 18;
+  const espacioBarras = 3;
+  const espacioGrupo = 22;
+  const grupoAncho = anchoBarra * 2 + espacioBarras;
+  const ancho = datos.length * (grupoAncho + espacioGrupo) + espacioGrupo;
+  const maxAbs = Math.max(1, ...datos.map((d) => Math.max(d.valorA, d.valorB ?? 0)));
+  const baseY = alto - 8;
+  const escala = (alto - 8 - 28) / maxAbs;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: colorA }} />
+          {leyendaA}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: colorB }} />
+          {leyendaB}
+        </span>
+      </div>
+      <div className="flex justify-center overflow-x-auto">
+        <svg width={ancho} height={alto + 24} role="img" aria-label="Gráfico de barras agrupadas">
+          <line x1={0} y1={baseY} x2={ancho} y2={baseY} stroke="#c3c2b7" strokeWidth={1} />
+          {datos.map((d, i) => {
+            const xGrupo = espacioGrupo + i * (grupoAncho + espacioGrupo);
+            const hA = d.valorA > 0 ? Math.max(d.valorA * escala, 2) : 0;
+            const yA = baseY - hA;
+            const hB = d.valorB !== null && d.valorB > 0 ? Math.max(d.valorB * escala, 2) : 0;
+            const yB = baseY - hB;
+            const xB = xGrupo + anchoBarra + espacioBarras;
+
+            return (
+              <g key={i}>
+                <rect
+                  x={xGrupo}
+                  y={yA}
+                  width={anchoBarra}
+                  height={hA}
+                  rx={3}
+                  fill={colorA}
+                  opacity={hover === `${i}a` ? 1 : 0.85}
+                  onMouseEnter={() => setHover(`${i}a`)}
+                  onMouseLeave={() => setHover(null)}
+                  className="cursor-default"
+                />
+                {hA > 0 && (
+                  <text x={xGrupo + anchoBarra / 2} y={yA - 4} textAnchor="middle" fontSize={9} fill="#52514e">
+                    {d.textoA}
+                  </text>
+                )}
+                {d.valorB !== null && (
+                  <>
+                    <rect
+                      x={xB}
+                      y={yB}
+                      width={anchoBarra}
+                      height={hB}
+                      rx={3}
+                      fill={colorB}
+                      opacity={hover === `${i}b` ? 1 : 0.85}
+                      onMouseEnter={() => setHover(`${i}b`)}
+                      onMouseLeave={() => setHover(null)}
+                      className="cursor-default"
+                    />
+                    {hB > 0 && (
+                      <text x={xB + anchoBarra / 2} y={yB - 4} textAnchor="middle" fontSize={9} fill="#52514e">
+                        {d.textoB}
+                      </text>
+                    )}
+                  </>
+                )}
+                <text
+                  x={xGrupo + grupoAncho / 2}
+                  y={alto + 18}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fill="#898781"
+                >
+                  {d.etiqueta}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </div>
   );
 }

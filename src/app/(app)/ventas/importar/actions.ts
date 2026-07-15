@@ -16,6 +16,7 @@ export type FilaVentaHistorica = {
 
 export async function importarVentasHistoricas(
   filas: FilaVentaHistorica[],
+  descontarInventario: boolean,
 ): Promise<{ error: string | null; importadas: number | null }> {
   const supabase = await createClient();
   const {
@@ -46,6 +47,7 @@ export async function importarVentasHistoricas(
       costo_unitario: f.costoUnitario,
       metodo_pago: f.metodoPago,
     })),
+    p_descontar_inventario: descontarInventario,
   });
 
   if (error) return { error: error.message, importadas: null };

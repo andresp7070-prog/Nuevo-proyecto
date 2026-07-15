@@ -36,7 +36,9 @@ export async function buscarClientes(query: string): Promise<ClienteEncontrado[]
 }
 
 export type ItemVentaInput = {
-  itemId: string;
+  itemId: string | null;
+  nombreLibre: string | null;
+  costoUnitario: number | null;
   cantidad: number;
   precioUnitario: number;
   promocionId: string | null;
@@ -78,6 +80,8 @@ export async function guardarVenta(input: {
     p_atributos_venta: {},
     p_items: input.items.map((item) => ({
       item_id: item.itemId,
+      nombre_libre: item.nombreLibre,
+      costo_unitario: item.costoUnitario,
       cantidad: item.cantidad,
       precio_unitario: item.precioUnitario,
       promocion_id: item.promocionId,
@@ -89,4 +93,17 @@ export async function guardarVenta(input: {
 
   if (error) return { error: error.message };
   return { error: null, ventaId: ventaId as string };
+}
+
+export async function deshacerVenta(ventaId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No hay sesión activa." };
+
+  const { error } = await supabase.rpc("deshacer_venta", { p_venta_id: ventaId });
+
+  if (error) return { error: error.message };
+  return { error: null };
 }

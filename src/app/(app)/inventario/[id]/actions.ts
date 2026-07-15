@@ -92,3 +92,24 @@ export async function ajustarInventario(input: {
   if (error) return { error: error.message };
   return { error: null };
 }
+
+export async function registrarDotacion(input: {
+  itemId: string;
+  cantidad: number;
+  nota: string;
+}): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No hay sesión activa." };
+
+  const { error } = await supabase.rpc("registrar_dotacion", {
+    p_item_id: input.itemId,
+    p_cantidad: input.cantidad,
+    p_nota: input.nota || null,
+  });
+
+  if (error) return { error: error.message };
+  return { error: null };
+}

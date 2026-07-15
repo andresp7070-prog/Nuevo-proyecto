@@ -6,6 +6,7 @@ import { DescargarCsv } from "@/components/descargar-csv";
 
 type ItemLinea = {
   cantidad: number;
+  nombre_libre: string | null;
   inventario_items: { nombre: string } | null;
 };
 
@@ -57,7 +58,7 @@ export default async function VentasPage({
   const { data } = await supabase
     .from("ventas")
     .select(
-      "id, fecha, monto, cliente_nombre, metodo_pago, ventas_items ( cantidad, inventario_items ( nombre ) )",
+      "id, fecha, monto, cliente_nombre, metodo_pago, ventas_items ( cantidad, nombre_libre, inventario_items ( nombre ) )",
     )
     .eq("empresa_id", perfil.empresa_id)
     .order("fecha", { ascending: false });
@@ -95,7 +96,10 @@ export default async function VentasPage({
     monto: Number(venta.monto),
     metodo_pago: venta.metodo_pago ? (etiquetaMetodoPago[venta.metodo_pago] ?? venta.metodo_pago) : "",
     productos: venta.ventas_items
-      .map((item) => `${item.inventario_items?.nombre ?? "Producto eliminado"} x${item.cantidad}`)
+      .map(
+        (item) =>
+          `${item.inventario_items?.nombre ?? item.nombre_libre ?? "Producto eliminado"} x${item.cantidad}`,
+      )
       .join("; "),
   }));
 
@@ -168,7 +172,10 @@ export default async function VentasPage({
         <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200">
           {ventas.map((venta) => {
             const productos = venta.ventas_items
-              .map((item) => `${item.inventario_items?.nombre ?? "Producto eliminado"} ×${item.cantidad}`)
+              .map(
+                (item) =>
+                  `${item.inventario_items?.nombre ?? item.nombre_libre ?? "Producto eliminado"} ×${item.cantidad}`,
+              )
               .join(", ");
 
             return (

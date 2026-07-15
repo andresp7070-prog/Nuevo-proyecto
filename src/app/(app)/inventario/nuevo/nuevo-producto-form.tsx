@@ -204,6 +204,17 @@ export function NuevoProductoForm({
     const nombreFinal = primeraMayuscula(nombre.trim());
     const categoriaFinal = primeraMayuscula(categoria.trim());
 
+    if (!itemExistente) {
+      const coincidencia = items.find((i) => sinTildes(i.nombre) === sinTildes(nombreFinal));
+      if (coincidencia) {
+        setError(
+          `Ya existe un producto llamado "${coincidencia.nombre}" — selecciónalo de las sugerencias para agregarle cantidad, en vez de crear uno nuevo.`,
+        );
+        irAlCampo(nombreRef.current);
+        return;
+      }
+    }
+
     setGuardando(true);
     try {
       if (itemExistente) {

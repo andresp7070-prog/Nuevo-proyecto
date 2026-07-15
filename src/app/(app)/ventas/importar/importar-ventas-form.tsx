@@ -34,6 +34,7 @@ export function ImportarVentasForm({ nombresProductos }: { nombresProductos: str
   const [filas, setFilas] = useState<FilaVentaHistorica[]>([]);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
   const [nombreArchivo, setNombreArchivo] = useState<string | null>(null);
+  const [descontarInventario, setDescontarInventario] = useState(false);
 
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +115,7 @@ export function ImportarVentasForm({ nombresProductos }: { nombresProductos: str
     setError(null);
     setCargando(true);
     try {
-      const resultado = await importarVentasHistoricas(filas);
+      const resultado = await importarVentasHistoricas(filas, descontarInventario);
       if (resultado.error) {
         setError(resultado.error);
         return;
@@ -129,9 +130,12 @@ export function ImportarVentasForm({ nombresProductos }: { nombresProductos: str
     }
   }
 
-  const productosNoEncontrados = filas.filter(
-    (f) => f.producto && !nombresProductos.includes(f.producto),
-  ).length;
+  const nombresProductosNormalizados = nombresProductos.map((n) => sinTildes(n));
+  function productoConocido(producto: string) {
+    return !producto || nombresProductosNormalizados.includes(sinTildes(producto));
+  }
+
+  const productosNoEncontrados = filas.filter((f) => f.producto && !productoConocido(f.producto)).length;
 
   return (
     <div className="max-w-3xl">
@@ -169,16 +173,49 @@ export function ImportarVentasForm({ nombresProductos }: { nombresProductos: str
       <div className="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
         <p className="mb-2 font-medium text-gray-900">Para qué sirve esto</p>
         <p className="mb-1">
-          Para subir ventas que ya pasaron (de otra herramienta, o de un cuaderno/Excel) sin
-          perder el historial. Estas ventas <strong>nunca descuentan inventario</strong> ni
-          afectan tu stock actual — ya pasaron de verdad, descontarlas de nuevo duplicaría el
-          efecto.
+          Para subir varias ventas de una vez, en vez de una por una — ya sea historial de otra
+          herramienta, o ventas recientes que no se alcanzaron a registrar en el momento.
         </p>
         <p className="mb-1">
           1. Descarga la plantilla, llénala. La columna <strong>producto</strong> debe llamarse
-          exactamente igual que en tu catálogo de Inventario (cliente y costo son opcionales).
+          igual que en tu catálogo de Inventario (no importa mayúscula/minúscula ni tildes;
+          cliente y costo son opcionales).
         </p>
         <p>2. Súbela abajo — vas a ver una vista previa antes de confirmar nada.</p>
+      </div>
+
+      <div className="mb-4 rounded-xl border border-gray-200 p-4">
+        <p className="mb-2 text-sm font-medium text-gray-900">¿Estas ventas afectan tu inventario actual?</p>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="modo-carga-ventas"
+              checked={!descontarInventario}
+              onChange={() => setDescontarInventario(false)}
+              className="mt-0.5"
+            />
+            <span>
+              <strong>No</strong> — son ventas históricas o de migración, ya pasaron de verdad con
+              otro sistema. No descuentan stock ni afectan el inventario actual.
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="radio"
+              name="modo-carga-ventas"
+              checked={descontarInventario}
+              onChange={() => setDescontarInventario(true)}
+              className="mt-0.5"
+            />
+            <span>
+              <strong>Sí</strong> — son ventas reales que todavía no se han registrado (ej. de un
+              turno de noche). Descuentan del inventario igual que si se registraran una por una.
+              Si a alguna fila le falta stock suficiente, <strong>no se importa ninguna</strong> —
+              revisa tu inventario antes de subir el archivo.
+            </span>
+          </label>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -208,7 +245,8 @@ export function ImportarVentasForm({ nombresProductos }: { nombresProductos: str
             <p className="mb-2 text-xs text-amber-600">
               {productosNoEncontrados} fila(s) tienen un producto que no coincide con ninguno de
               tu catálogo — esa venta se guarda igual, solo queda sin ligar a inventario (no
-              contará en utilidad por producto).
+              contará en utilidad por producto{descontarInventario ? " ni descontará stock" : ""}
+              ).
             </p>
           )}
           <div className="max-h-80 overflow-y-auto rounded-xl border border-gray-200">
@@ -225,8 +263,7 @@ export function ImportarVentasForm({ nombresProductos }: { nombresProductos: str
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filas.map((fila, i) => {
-                  const productoDesconocido =
-                    fila.producto && !nombresProductos.includes(fila.producto);
+                  const productoDesconocido = fila.producto && !productoConocido(fila.producto);
                   return (
                     <tr key={i}>
                       <td className="px-3 py-2 text-gray-900">{fila.fecha.slice(0, 10)}</td>

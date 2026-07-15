@@ -24,6 +24,42 @@ export default async function NuevaVentaPage() {
     );
   }
 
+  const { data: empresa } = await supabase
+    .from("empresas")
+    .select("metodos_pago_disponibles, modulos_activos")
+    .eq("id", perfil.empresa_id)
+    .single();
+
+  const crmActivo = (empresa?.modulos_activos ?? []).includes("crm");
+  const inventarioActivo = (empresa?.modulos_activos ?? []).includes("inventario");
+
+  // Sin el módulo de Inventario, la empresa no tiene catálogo — la persona
+  // escribe libremente qué vendió, y solo le ayudamos con lo que ya haya
+  // escrito antes, en vez de un catálogo real.
+  if (!inventarioActivo) {
+    const { data: ventasPrevias } = await supabase
+      .from("ventas_items")
+      .select("nombre_libre, ventas!inner(empresa_id)")
+      .eq("ventas.empresa_id", perfil.empresa_id)
+      .not("nombre_libre", "is", null)
+      .limit(500);
+
+    const sugerenciasProductos = Array.from(
+      new Set((ventasPrevias ?? []).map((v) => v.nombre_libre).filter((n): n is string => Boolean(n))),
+    ).sort();
+
+    return (
+      <NuevaVentaForm
+        items={[]}
+        sugerenciasProductos={sugerenciasProductos}
+        inventarioActivo={false}
+        metodosPago={empresa?.metodos_pago_disponibles ?? []}
+        promociones={[]}
+        crmActivo={crmActivo}
+      />
+    );
+  }
+
   const { data: itemsData } = await supabase
     .from("inventario_items")
     .select("id, nombre, categoria, unidad, cantidad, precio_venta, sku, marca:atributos->>marca")
@@ -44,14 +80,6 @@ export default async function NuevaVentaPage() {
     ...item,
     diasRestantes: calcularDiasRestantes(item.cantidad, velocidadPorItem.get(item.id)),
   }));
-
-  const { data: empresa } = await supabase
-    .from("empresas")
-    .select("metodos_pago_disponibles, modulos_activos")
-    .eq("id", perfil.empresa_id)
-    .single();
-
-  const crmActivo = (empresa?.modulos_activos ?? []).includes("crm");
 
   const hoy = new Date().toISOString().slice(0, 10);
   const { data: promocionesData } = await supabase
@@ -82,6 +110,8 @@ export default async function NuevaVentaPage() {
   return (
     <NuevaVentaForm
       items={items}
+      sugerenciasProductos={[]}
+      inventarioActivo
       metodosPago={empresa?.metodos_pago_disponibles ?? []}
       promociones={promociones}
       crmActivo={crmActivo}

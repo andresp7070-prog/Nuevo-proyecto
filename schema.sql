@@ -44,7 +44,17 @@ create table empresas (
 create table perfiles (
   id uuid primary key references auth.users(id) on delete cascade,
   empresa_id uuid references empresas(id),
-  rol text not null default 'cliente' check (rol in ('cliente','admin')),
+  -- 'admin' es un rol de plataforma reservado para futuro personal de
+  -- soporte (sin acceso al reporte global). 'super_admin' es exclusivamente
+  -- la cuenta dueña de la plataforma — ver requerirAdmin() en el código,
+  -- que además verifica el id exacto del usuario, no solo este rol.
+  rol text not null default 'cliente' check (rol in ('cliente','admin','super_admin')),
+  -- Rol DENTRO de la empresa (solo aplica cuando rol = 'cliente'; varias
+  -- personas de la misma empresa pueden tener perfiles distintos, cada una
+  -- con su propio login). 'administrador' ve todo lo que la empresa tiene
+  -- activo; 'vendedor' solo ve el módulo de Ventas, sin importar qué otros
+  -- módulos tenga la empresa.
+  rol_empresa text not null default 'administrador' check (rol_empresa in ('administrador','vendedor')),
   nombre text,
   debe_cambiar_password boolean not null default true,  -- true al crear la cuenta; se apaga solo cuando cambia su contraseña por primera vez
   created_at timestamptz default now()
@@ -161,7 +171,7 @@ create table inventario_movimientos (
   id uuid primary key default gen_random_uuid(),
   item_id uuid references inventario_items(id) not null,
   tipo text not null check (tipo in ('entrada','salida')),
-  motivo text check (motivo in ('compra','ajuste','devolucion','trasvase')),  -- solo aplica a entradas; 'compra' genera un gasto automático
+  motivo text check (motivo in ('compra','ajuste','devolucion','trasvase','dotacion')),  -- 'compra' genera un gasto automático (solo entradas); 'dotacion' también genera un gasto automático (solo salidas)
   cantidad numeric(12,2) not null,
   fecha date default current_date,
   nota text
@@ -231,6 +241,11 @@ create table ventas_items (
   id uuid primary key default gen_random_uuid(),
   venta_id uuid references ventas(id) not null,
   item_id uuid references inventario_items(id),
+  -- Nombre libre de lo vendido, para una empresa sin el módulo de Inventario
+  -- activo (no tiene catálogo): item_id queda null y esto guarda qué se
+  -- vendió, escrito a mano. Si item_id sí está, el nombre sale del catálogo
+  -- y esto queda null — nunca se necesitan los dos a la vez.
+  nombre_libre text,
   cantidad numeric(12,2) not null default 1,
   precio_unitario numeric(12,2) not null,
   costo_unitario numeric(12,2),   -- costo del ítem congelado al momento de la venta, para que la utilidad histórica no cambie si el costo sube después
@@ -443,6 +458,56 @@ begin
 end;
 $$;
 
+-- Dotación: productos que se le entregan a un empleado (esponjas, uniformes,
+-- etc.), no a un cliente. No es una venta (no genera ingreso), pero sí es un
+-- costo real del negocio, así que además de descontar el inventario (por
+-- FIFO, igual que una venta) genera su propio gasto automático en
+-- finanzas_movimientos — a diferencia de un 'ajuste' por pérdida o daño, que
+-- no debe tocar el P y G.
+create or replace function registrar_dotacion(
+  p_item_id uuid,
+  p_cantidad numeric,
+  p_nota text default null
+)
+returns void
+language plpgsql
+as $$
+declare
+  v_empresa_id uuid;
+  v_nombre text;
+  v_stock numeric(12,2);
+  v_costo_consumido numeric(12,2);
+begin
+  select empresa_id, nombre, cantidad into v_empresa_id, v_nombre, v_stock
+  from inventario_items where id = p_item_id;
+
+  if v_empresa_id is null then
+    raise exception 'Producto no encontrado';
+  end if;
+  if p_cantidad <= 0 then
+    raise exception 'La cantidad debe ser mayor a cero';
+  end if;
+  if v_stock < p_cantidad then
+    raise exception 'No hay suficiente stock de "%": quedan % y se intentó entregar %.',
+      v_nombre, v_stock, p_cantidad;
+  end if;
+
+  v_costo_consumido := consumir_lotes_fifo(p_item_id, p_cantidad);
+
+  insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
+  values (p_item_id, 'salida', 'dotacion', p_cantidad, p_nota);
+
+  update inventario_items set cantidad = cantidad - p_cantidad where id = p_item_id;
+
+  insert into finanzas_movimientos (empresa_id, tipo, categoria, monto, nota)
+  values (
+    v_empresa_id, 'gasto', 'dotación a empleados',
+    p_cantidad * coalesce(v_costo_consumido, 0),
+    coalesce(p_nota, 'Dotación de "' || v_nombre || '" a empleado')
+  );
+end;
+$$;
+
 -- Carga masiva de inventario inicial: para una empresa que llega con su propio
 -- catálogo (de otra herramienta o de una hoja de Excel a mano). Por cada fila
 -- del CSV, si el producto ya existe (mismo nombre en la empresa) le suma la
@@ -451,7 +516,8 @@ $$;
 -- movimientos. Devuelve cuántos productos nuevos creó.
 create or replace function cargar_inventario_inicial(
   p_empresa_id uuid,
-  p_items jsonb  -- [{"nombre":"...","categoria":"...","unidad":"unidad","cantidad":10,"costo":1000,"precio_venta":2000}, ...]
+  p_items jsonb,  -- [{"nombre":"...","categoria":"...","unidad":"unidad","cantidad":10,"costo":1000,"precio_venta":2000,"es_insumo":false}, ...]
+  p_reemplazar boolean default false  -- true: el archivo reemplaza la cantidad de cada producto (carga inicial o recuento completo); false: suma a lo que ya hay (reabastecimiento)
 )
 returns int
 language plpgsql
@@ -462,28 +528,53 @@ declare
   v_item_id uuid;
   v_cantidad numeric;
   v_costo numeric;
+  v_es_insumo boolean;
+  v_precio_venta numeric;
   v_creados int := 0;
+  v_items_reseteados uuid[] := '{}';
 begin
   for v_item in select * from jsonb_array_elements(p_items)
   loop
     v_cantidad := (v_item->>'cantidad')::numeric;
     v_costo := (v_item->>'costo')::numeric;
+    v_es_insumo := coalesce((v_item->>'es_insumo')::boolean, false);
+    -- un insumo puro no se vende individualmente, así que nunca tiene precio de venta
+    v_precio_venta := case when v_es_insumo then null else (v_item->>'precio_venta')::numeric end;
 
     select id into v_existente_id
     from inventario_items
-    where empresa_id = p_empresa_id and nombre = (v_item->>'nombre')
+    where empresa_id = p_empresa_id
+      and lower(unaccent(nombre)) = lower(unaccent(v_item->>'nombre'))
     limit 1;
 
     if v_existente_id is not null then
-      update inventario_items
-      set cantidad = cantidad + v_cantidad,
-          costo = coalesce(v_costo, costo),
-          precio_venta = coalesce((v_item->>'precio_venta')::numeric, precio_venta),
-          categoria = coalesce(nullif(v_item->>'categoria', ''), categoria)
-      where id = v_existente_id;
+      if p_reemplazar and not (v_existente_id = any(v_items_reseteados)) then
+        -- primera fila de este producto en una carga que reemplaza: se
+        -- descarta el stock y los lotes anteriores, empieza de cero con lo
+        -- que diga el archivo
+        delete from inventario_lotes where item_id = v_existente_id;
+        update inventario_items
+        set cantidad = v_cantidad,
+            costo = coalesce(v_costo, costo),
+            precio_venta = case when v_es_insumo then null else coalesce(v_precio_venta, precio_venta) end,
+            categoria = coalesce(nullif(v_item->>'categoria', ''), categoria),
+            es_insumo = v_es_insumo
+        where id = v_existente_id;
+        v_items_reseteados := v_items_reseteados || v_existente_id;
+      else
+        -- reabastecimiento normal, o segunda fila del mismo producto en una
+        -- carga que reemplaza (mismo nombre, distinto costo = otro lote)
+        update inventario_items
+        set cantidad = cantidad + v_cantidad,
+            costo = coalesce(v_costo, costo),
+            precio_venta = case when v_es_insumo then null else coalesce(v_precio_venta, precio_venta) end,
+            categoria = coalesce(nullif(v_item->>'categoria', ''), categoria),
+            es_insumo = v_es_insumo
+        where id = v_existente_id;
+      end if;
       v_item_id := v_existente_id;
     else
-      insert into inventario_items (empresa_id, nombre, categoria, unidad, cantidad, costo, precio_venta)
+      insert into inventario_items (empresa_id, nombre, categoria, unidad, cantidad, costo, precio_venta, es_insumo)
       values (
         p_empresa_id,
         v_item->>'nombre',
@@ -491,10 +582,12 @@ begin
         coalesce(nullif(v_item->>'unidad', ''), 'unidad'),
         v_cantidad,
         v_costo,
-        (v_item->>'precio_venta')::numeric
+        v_precio_venta,
+        v_es_insumo
       )
       returning id into v_item_id;
       v_creados := v_creados + 1;
+      v_items_reseteados := v_items_reseteados || v_item_id;
     end if;
 
     if v_cantidad > 0 then
@@ -739,11 +832,16 @@ insert into festivos (fecha, nombre) values
 
 -- Vista: ventas por día, marcando día de la semana y si fue festivo.
 -- Responde directo "¿vendemos más los festivos?" — se filtra o agrupa por es_festivo.
+-- "at time zone 'America/Bogota'" convierte la marca de tiempo (guardada en
+-- UTC) a la hora real de Colombia antes de truncarla a un día — si no, una
+-- venta después de las 7pm (Colombia) quedaba contada como del día
+-- siguiente en UTC, y por eso podía no coincidir con el festivo real ni con
+-- el día de la semana correcto.
 create or replace view vista_ventas_por_dia as
 select
   v.empresa_id,
-  v.fecha::date as dia,
-  case extract(dow from v.fecha::date)::int
+  (v.fecha at time zone 'America/Bogota')::date as dia,
+  case extract(dow from (v.fecha at time zone 'America/Bogota')::date)::int
     when 0 then 'Domingo' when 1 then 'Lunes' when 2 then 'Martes'
     when 3 then 'Miércoles' when 4 then 'Jueves' when 5 then 'Viernes'
     when 6 then 'Sábado'
@@ -753,8 +851,8 @@ select
   count(v.id) as numero_ventas,
   sum(v.monto) as total_vendido
 from ventas v
-left join festivos f on f.fecha = v.fecha::date
-group by v.empresa_id, v.fecha::date, f.fecha, f.nombre;
+left join festivos f on f.fecha = (v.fecha at time zone 'America/Bogota')::date
+group by v.empresa_id, (v.fecha at time zone 'America/Bogota')::date, f.fecha, f.nombre;
 
 -- ------------------------------------------------------------
 -- Vista: Perfil de compra de un cliente
@@ -1098,6 +1196,7 @@ create or replace function registrar_venta(
   p_atributos_cliente jsonb,    -- ej. {"placa": "ABC123", "modelo": "Dominar 250"}
   p_atributos_venta jsonb,      -- ej. {"km": 15000}
   p_items jsonb,                 -- ej. [{"item_id":"...","cantidad":1,"precio_unitario":20000,"promocion_id":null,"descuento_aplicado":0}, ...]
+                                  -- o, sin catálogo (empresa sin Inventario): [{"nombre_libre":"Camisa talla M","cantidad":1,"precio_unitario":45000,"costo_unitario":20000}, ...]
   p_fecha timestamptz default null,  -- si la persona cambió la fecha/hora sugerida; null = usar el momento actual
   p_metodo_pago text default null    -- uno de los valores en empresas.metodos_pago_disponibles
 )
@@ -1154,15 +1253,19 @@ begin
   returning id into v_venta_id;
 
   -- 4. Agregar cada producto o servicio vendido, con su promoción si aplica
-  --    (esto dispara el descuento de inventario, solo para productos)
+  --    (esto dispara el descuento de inventario, solo para productos con
+  --    item_id — una empresa sin Inventario no manda item_id, solo
+  --    nombre_libre y su propio costo_unitario, y no pasa por ese trigger)
   for v_item in select * from jsonb_array_elements(p_items)
   loop
-    insert into ventas_items (venta_id, item_id, cantidad, precio_unitario, promocion_id, descuento_aplicado)
+    insert into ventas_items (venta_id, item_id, nombre_libre, cantidad, precio_unitario, costo_unitario, promocion_id, descuento_aplicado)
     values (
       v_venta_id,
-      (v_item->>'item_id')::uuid,
+      nullif(v_item->>'item_id','')::uuid,
+      nullif(v_item->>'nombre_libre',''),
       (v_item->>'cantidad')::numeric,
       (v_item->>'precio_unitario')::numeric,
+      nullif(v_item->>'costo_unitario','')::numeric,
       nullif(v_item->>'promocion_id','')::uuid,
       coalesce((v_item->>'descuento_aplicado')::numeric, 0)
     );
@@ -1172,17 +1275,73 @@ begin
 end;
 $$;
 
+-- Deshacer una venta recién registrada, para corregir un error sin dejar el
+-- inventario mal calculado. Solo funciona en los 2 minutos siguientes a
+-- haberla creado (la app solo ofrece el botón durante 60 segundos; este
+-- margen extra es por si hay algo de latencia). En vez de intentar
+-- reconstruir el lote exacto que consumió el FIFO (frágil si hubo otra
+-- venta del mismo producto en el medio), crea un lote nuevo de entrada al
+-- costo que quedó congelado en la venta — la cantidad y el costo quedan
+-- exactamente igual que antes de vender, aunque no sea "el mismo" lote.
+-- No revierte nada del CRM (si creó o actualizó un contacto, se queda así).
+create or replace function deshacer_venta(p_venta_id uuid)
+returns void
+language plpgsql
+as $$
+declare
+  v_creada_en timestamptz;
+  v_item record;
+begin
+  select created_at into v_creada_en from ventas where id = p_venta_id;
+  if v_creada_en is null then
+    raise exception 'Venta no encontrada';
+  end if;
+  if now() - v_creada_en > interval '2 minutes' then
+    raise exception 'Ya pasó el tiempo para deshacer esta venta';
+  end if;
+
+  for v_item in
+    select vi.item_id, vi.cantidad, vi.costo_unitario, ii.tipo
+    from ventas_items vi
+    join inventario_items ii on ii.id = vi.item_id
+    where vi.venta_id = p_venta_id and vi.item_id is not null
+  loop
+    if v_item.tipo = 'producto' then
+      insert into inventario_lotes (item_id, cantidad_disponible, costo_unitario)
+      values (v_item.item_id, v_item.cantidad, coalesce(v_item.costo_unitario, 0));
+
+      insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
+      values (v_item.item_id, 'entrada', 'devolucion', v_item.cantidad, 'Venta deshecha');
+
+      update inventario_items
+      set cantidad = cantidad + v_item.cantidad
+      where id = v_item.item_id;
+    end if;
+  end loop;
+
+  delete from ventas_items where venta_id = p_venta_id;
+  delete from ventas where id = p_venta_id;
+end;
+$$;
+
 -- Carga masiva de ventas históricas: para una empresa que migra desde otra
 -- herramienta (o una hoja de Excel) y quiere conservar su historial de
--- ventas. A diferencia de registrar_venta(), estas ventas NUNCA descuentan
--- inventario ni recalculan costo por FIFO — ya pasaron de verdad en el
--- sistema anterior del cliente, volver a descontarlas duplicaría el efecto.
+-- ventas. Por defecto (p_descontar_inventario = false) estas ventas NUNCA
+-- descuentan inventario ni recalculan costo por FIFO — para migrar ventas
+-- que ya pasaron de verdad en el sistema anterior del cliente, donde volver
+-- a descontarlas duplicaría el efecto. Si p_descontar_inventario = true, se
+-- comportan como ventas reales (registrar_venta()): sí descuentan stock por
+-- FIFO y bloquean la fila si no hay suficiente — útil para cargar ventas
+-- recientes en lote (ej. de un turno de noche) que sí deben afectar el
+-- inventario actual. Como toda la carga corre en una sola transacción, si
+-- una fila falla por falta de stock en ese modo, NINGUNA fila se importa.
 -- Cada fila es una venta de un solo producto (una fila del CSV = una línea
 -- vendida); si el producto no existe en el catálogo, la venta igual se
 -- guarda, solo queda sin ligar a inventario. Devuelve cuántas se importaron.
 create or replace function importar_ventas_historicas(
   p_empresa_id uuid,
-  p_ventas jsonb  -- [{"fecha":"2026-03-01","cliente_nombre":"...","cliente_telefono":"...","cliente_email":"...","producto":"...","cantidad":1,"precio_unitario":1000,"costo_unitario":700,"metodo_pago":"efectivo"}, ...]
+  p_ventas jsonb,  -- [{"fecha":"2026-03-01","cliente_nombre":"...","cliente_telefono":"...","cliente_email":"...","producto":"...","cantidad":1,"precio_unitario":1000,"costo_unitario":700,"metodo_pago":"efectivo"}, ...]
+  p_descontar_inventario boolean default false
 )
 returns int
 language plpgsql
@@ -1197,7 +1356,7 @@ declare
   v_precio numeric;
   v_costo numeric;
 begin
-  perform set_config('app.importando_historico', 'true', true);
+  perform set_config('app.importando_historico', (not p_descontar_inventario)::text, true);
 
   for v_fila in select * from jsonb_array_elements(p_ventas)
   loop
@@ -1205,7 +1364,8 @@ begin
     if coalesce(v_fila->>'producto', '') <> '' then
       select id into v_item_id
       from inventario_items
-      where empresa_id = p_empresa_id and nombre = (v_fila->>'producto')
+      where empresa_id = p_empresa_id
+        and lower(unaccent(nombre)) = lower(unaccent(v_fila->>'producto'))
       limit 1;
     end if;
 
@@ -1249,8 +1409,15 @@ begin
     )
     returning id into v_venta_id;
 
-    insert into ventas_items (venta_id, item_id, cantidad, precio_unitario, costo_unitario)
-    values (v_venta_id, v_item_id, v_cantidad, v_precio, v_costo);
+    insert into ventas_items (venta_id, item_id, nombre_libre, cantidad, precio_unitario, costo_unitario)
+    values (
+      v_venta_id,
+      v_item_id,
+      case when v_item_id is null then nullif(v_fila->>'producto', '') end,
+      v_cantidad,
+      v_precio,
+      v_costo
+    );
 
     v_importadas := v_importadas + 1;
   end loop;
