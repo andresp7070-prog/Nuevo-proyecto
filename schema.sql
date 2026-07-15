@@ -1425,3 +1425,14 @@ begin
   return v_importadas;
 end;
 $$;
+
+-- Tamaño total de la base de datos, en bytes — para el panel de
+-- administrador (sección "Uso de la plataforma"). No expone nada de ninguna
+-- empresa en particular, solo un número agregado de toda la base.
+create or replace function tamano_base_datos()
+returns bigint
+language sql
+stable
+as $$
+  select pg_database_size(current_database());
+$$;
