@@ -11,9 +11,26 @@ const NOMBRE_MODULO: Record<string, string> = {
   promociones: "Promociones",
 };
 
+const NOMBRE_TIPO_NEGOCIO: Record<string, string> = {
+  aseo: "Aseo",
+  ropa: "Ropa",
+  restaurante: "Restaurante",
+  cafeteria: "Cafetería",
+  belleza: "Belleza",
+  ferreteria: "Ferretería",
+  taller: "Taller",
+  tienda: "Tienda",
+  papeleria: "Papelería",
+  otro: "Otro",
+};
+
 function formatoMoneda(valor: number) {
   return valor.toLocaleString("es-CO", { style: "currency", currency: "COP" });
 }
+
+// Límite del plan actual de Supabase (Free = 500 MB). Si subes a Pro, el
+// límite pasa a 8 GB — actualiza este número si cambias de plan.
+const LIMITE_BD_BYTES = 500 * 1024 * 1024;
 
 function formatoBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -56,7 +73,7 @@ export default async function AdminDashboardPage() {
   ] = await Promise.all([
     supabase
       .from("empresas")
-      .select("id, nombre, tipo_negocio, modulos_activos, created_at")
+      .select("id, nombre, tipo_negocio, modulos_activos, monto_mensual, created_at")
       .order("created_at", { ascending: false }),
     supabase.from("ventas").select("monto").gte("fecha", inicioMesIso),
     supabase.from("ventas").select("monto").gte("fecha", inicioAnioIso),
@@ -69,6 +86,10 @@ export default async function AdminDashboardPage() {
   const totalVentasMes = (ventasMes ?? []).reduce((suma, v) => suma + Number(v.monto), 0);
   const totalVentasAnio = (ventasAnio ?? []).reduce((suma, v) => suma + Number(v.monto), 0);
   const empresasActivas = new Set((ventasRecientes ?? []).map((v) => v.empresa_id)).size;
+  const ingresosMensuales = listaEmpresas.reduce(
+    (suma, e) => suma + Number(e.monto_mensual ?? 0),
+    0,
+  );
 
   const conteoModulos: Record<string, number> = {};
   for (const empresa of listaEmpresas) {
@@ -90,7 +111,7 @@ export default async function AdminDashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-400">Empresas cliente</p>
           <p className="mt-1 text-2xl font-semibold text-gray-900">{totalEmpresas}</p>
@@ -107,6 +128,13 @@ export default async function AdminDashboardPage() {
             {formatoMoneda(totalVentasAnio)} en total este año
           </p>
         </div>
+        <div className="rounded-xl border border-gray-200 p-4">
+          <p className="text-xs text-gray-400">Ingresos por suscripción (nuestros, al mes)</p>
+          <p className="mt-1 text-2xl font-semibold text-gray-900">
+            {formatoMoneda(ingresosMensuales)}
+          </p>
+          <p className="mt-1 text-xs text-gray-400">Cargado a mano por empresa</p>
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 p-4">
@@ -116,7 +144,21 @@ export default async function AdminDashboardPage() {
             <p className="text-xs text-gray-400">Base de datos (Supabase)</p>
             <p className="mt-1 text-lg font-semibold text-gray-900">
               {tamanoBd !== null && tamanoBd !== undefined ? formatoBytes(Number(tamanoBd)) : "—"}
+              <span className="text-sm font-normal text-gray-400">
+                {" "}
+                de {formatoBytes(LIMITE_BD_BYTES)}
+              </span>
             </p>
+            {tamanoBd !== null && tamanoBd !== undefined && (
+              <div className="mt-2 h-2 rounded-full bg-gray-100">
+                <div
+                  className="h-2 rounded-full bg-accent"
+                  style={{
+                    width: `${Math.min(100, (Number(tamanoBd) / LIMITE_BD_BYTES) * 100)}%`,
+                  }}
+                />
+              </div>
+            )}
           </div>
           <div>
             <p className="text-xs text-gray-400">Ancho de banda (Vercel)</p>
@@ -164,6 +206,7 @@ export default async function AdminDashboardPage() {
                 <th className="px-2 py-2">Nombre</th>
                 <th className="px-2 py-2">Tipo de negocio</th>
                 <th className="px-2 py-2">Módulos</th>
+                <th className="px-2 py-2">Mensualidad</th>
                 <th className="px-2 py-2">Desde</th>
               </tr>
             </thead>
@@ -171,11 +214,16 @@ export default async function AdminDashboardPage() {
               {listaEmpresas.map((empresa) => (
                 <tr key={empresa.id}>
                   <td className="px-2 py-2 text-gray-900">{empresa.nombre}</td>
-                  <td className="px-2 py-2 text-gray-500">{empresa.tipo_negocio ?? "—"}</td>
+                  <td className="px-2 py-2 text-gray-500">
+                    {empresa.tipo_negocio ? NOMBRE_TIPO_NEGOCIO[empresa.tipo_negocio] ?? empresa.tipo_negocio : "—"}
+                  </td>
                   <td className="px-2 py-2 text-gray-500">
                     {(empresa.modulos_activos ?? [])
                       .map((m: string) => NOMBRE_MODULO[m] ?? m)
                       .join(", ") || "—"}
+                  </td>
+                  <td className="px-2 py-2 text-gray-500">
+                    {empresa.monto_mensual ? formatoMoneda(Number(empresa.monto_mensual)) : "—"}
                   </td>
                   <td className="px-2 py-2 text-gray-500">
                     {new Date(empresa.created_at).toLocaleDateString("es-CO")}

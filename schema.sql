@@ -24,7 +24,13 @@ create table planes (
 create table empresas (
   id uuid primary key default gen_random_uuid(),
   nombre text not null,
-  tipo_negocio text,                          -- 'ferreteria', 'peluqueria', etc.
+  -- Lista fija para que quede consistente y se pueda agrupar/filtrar bien
+  -- (antes era texto libre). 'otro' es el escape para un negocio que no
+  -- encaja en ninguna — nunca debe bloquear un onboarding.
+  tipo_negocio text
+    check (tipo_negocio is null or tipo_negocio in (
+      'aseo','ropa','restaurante','cafeteria','belleza','ferreteria','taller','tienda','papeleria','otro'
+    )),
   plan_id uuid references planes(id),
   modulos_activos text[] default '{}',        -- ajuste manual sobre el plan
   pagina_entrada text not null default 'ventas'
@@ -35,6 +41,11 @@ create table empresas (
   metodos_pago_disponibles text[] not null default '{efectivo,tarjeta,transferencia}'
     check (metodos_pago_disponibles <@ array['efectivo','tarjeta','transferencia','nequi','daviplata','otro']::text[]),
   logo_path text,  -- ruta dentro del bucket 'empresas-logos' de Supabase Storage; opcional
+  -- Cuánto paga esta empresa al mes por la suscripción — se llena a mano por
+  -- ahora (los precios de los planes no están en firme, y no hay pasarela de
+  -- pago conectada todavía). El día que haya cobro automático, esto se
+  -- reemplaza por la suma de los cobros reales, no por este campo.
+  monto_mensual numeric(12,2),
   created_at timestamptz default now()
 );
 
