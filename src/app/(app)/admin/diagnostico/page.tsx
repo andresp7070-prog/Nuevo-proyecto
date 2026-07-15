@@ -30,25 +30,37 @@ async function llamar(url: string, token: string | undefined) {
 export default async function DiagnosticoPage() {
   await requerirAdmin();
 
-  const vercelToken = process.env.VERCEL_API_TOKEN;
   const supabaseToken = process.env.SUPABASE_ACCESS_TOKEN;
   const ref = refSupabaseDesdeUrl();
 
-  // Ya confirmamos que la autenticación funciona (con los intentos de la
-  // primera ronda); estos son intentos puntuales a rutas candidatas para
-  // encontrar dónde vive el dato de uso/consumo real.
-  const teamId = "team_KtGBiWKLJMM1AFOcNDAzB25Q";
-  const orgSlug = "afndomgkcysvlxstqett";
-
+  // Vercel ya quedó descartado en la ronda anterior: /usage y /billing/charges
+  // dan 404 en plan Hobby (confirmado también en su documentación pública).
+  // Estos son intentos puntuales para encontrar el uso de Supabase.
   const resultados = await Promise.all([
-    llamar(`https://api.vercel.com/v1/teams/${teamId}`, vercelToken),
-    llamar(`https://api.vercel.com/v1/teams/${teamId}/usage`, vercelToken),
-    llamar(`https://api.vercel.com/v1/teams/${teamId}/billing/charges`, vercelToken),
     ref
-      ? llamar(`https://api.supabase.com/v1/projects/${ref}/usage`, supabaseToken)
+      ? llamar(
+          `https://api.supabase.com/v0/projects/${ref}/analytics/endpoints/usage.api-counts`,
+          supabaseToken,
+        )
       : Promise.resolve({ url: "(sin ref)", error: "sin ref" }),
-    llamar(`https://api.supabase.com/v1/organizations/${orgSlug}`, supabaseToken),
-    llamar(`https://api.supabase.com/v1/organizations/${orgSlug}/usage`, supabaseToken),
+    ref
+      ? llamar(
+          `https://api.supabase.com/v0/projects/${ref}/analytics/endpoints/usage.db-size`,
+          supabaseToken,
+        )
+      : Promise.resolve({ url: "(sin ref)", error: "sin ref" }),
+    ref
+      ? llamar(
+          `https://api.supabase.com/v0/projects/${ref}/analytics/endpoints/usage.storage-size`,
+          supabaseToken,
+        )
+      : Promise.resolve({ url: "(sin ref)", error: "sin ref" }),
+    ref
+      ? llamar(
+          `https://api.supabase.com/v1/projects/${ref}/health`,
+          supabaseToken,
+        )
+      : Promise.resolve({ url: "(sin ref)", error: "sin ref" }),
   ]);
 
   return (
