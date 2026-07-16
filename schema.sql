@@ -50,7 +50,25 @@ create table empresas (
 );
 
 -- ------------------------------------------------------------
--- 3. PERFILES — une el login de Supabase (auth.users) con una empresa y un rol
+-- 3. PUNTOS DE VENTA — para empresas con más de un punto físico (varias
+-- sedes, un carrito móvil, un stand de eventos). La mayoría de las empresas
+-- nunca usan esta tabla: es opcional, no un paso obligatorio del onboarding.
+-- El CRM (crm_contactos) queda a nivel de EMPRESA, no de punto — así un
+-- cliente que compra en un punto y luego en otro sigue siendo la misma
+-- persona con un solo historial. Ventas e inventario sí quedan por punto,
+-- porque cada uno vende y tiene stock por separado.
+-- ------------------------------------------------------------
+create table puntos_venta (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid references empresas(id) not null,
+  nombre text not null,
+  activo boolean not null default true,
+  created_at timestamptz default now(),
+  unique (empresa_id, nombre)
+);
+
+-- ------------------------------------------------------------
+-- 4. PERFILES — une el login de Supabase (auth.users) con una empresa y un rol
 -- ------------------------------------------------------------
 create table perfiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -66,6 +84,10 @@ create table perfiles (
   -- activo; 'vendedor' solo ve el módulo de Ventas, sin importar qué otros
   -- módulos tenga la empresa.
   rol_empresa text not null default 'administrador' check (rol_empresa in ('administrador','vendedor')),
+  -- Solo aplica si la empresa usa puntos_venta. null = ve toda la empresa
+  -- (cuenta general / administrador); con un punto asignado, ve solo ese
+  -- punto (ej. el barista de un punto específico).
+  punto_venta_id uuid references puntos_venta(id),
   nombre text,
   debe_cambiar_password boolean not null default true,  -- true al crear la cuenta; se apaga solo cuando cambia su contraseña por primera vez
   created_at timestamptz default now()
@@ -100,6 +122,9 @@ create table suscripciones (
 create table ventas (
   id uuid primary key default gen_random_uuid(),
   empresa_id uuid references empresas(id) not null,
+  -- Solo aplica si la empresa usa puntos_venta; null para el resto (la
+  -- inmensa mayoría de las empresas).
+  punto_venta_id uuid references puntos_venta(id),
   fecha timestamptz not null default now(),  -- fecha Y hora; siempre sugiere el momento actual, pero es editable
   monto numeric(12,2) not null,
   cliente_nombre text,
@@ -162,6 +187,10 @@ create table proveedores (
 create table inventario_items (
   id uuid primary key default gen_random_uuid(),
   empresa_id uuid references empresas(id) not null,
+  -- Solo aplica si la empresa usa puntos_venta; null para el resto. Cada
+  -- punto tiene su propio stock — el mismo producto en dos puntos son dos
+  -- filas distintas, no una compartida.
+  punto_venta_id uuid references puntos_venta(id),
   nombre text not null,
   sku text,
   categoria text,
@@ -988,6 +1017,7 @@ group by p.id, p.empresa_id, p.nombre, p.tipo_promocion, p.codigo, p.fecha_inici
 -- ============================================================
 
 alter table empresas enable row level security;
+alter table puntos_venta enable row level security;
 alter table perfiles enable row level security;
 alter table diagnosticos enable row level security;
 alter table suscripciones enable row level security;
@@ -1020,9 +1050,20 @@ returns boolean language sql stable security definer set search_path = public as
   select rol = 'admin' from perfiles where id = auth.uid();
 $$;
 
+-- A qué punto de venta está limitado el usuario actual. null = ve toda la
+-- empresa (caso normal: cuenta general, o cualquier empresa que no usa
+-- puntos_venta). Con un valor, solo ve ese punto.
+create or replace function mi_punto_venta_id()
+returns uuid language sql stable security definer set search_path = public as $$
+  select punto_venta_id from perfiles where id = auth.uid();
+$$;
+
 -- Políticas: mismo patrón repetido en cada tabla con empresa_id
 create policy "ver mi propia empresa" on empresas
   for select using (id = mi_empresa_id() or es_admin());
+
+create policy "ver mis puntos de venta" on puntos_venta
+  for all using (empresa_id = mi_empresa_id() or es_admin());
 
 -- Solo permite actualizar (nunca crear ni borrar) la propia fila de empresa.
 -- En la práctica, el único código de la aplicación que escribe aquí es
@@ -1045,14 +1086,25 @@ create policy "ver mis diagnosticos" on diagnosticos
 create policy "ver mis suscripciones" on suscripciones
   for all using (empresa_id = mi_empresa_id() or es_admin());
 
+-- Con puntos_venta: si mi perfil está limitado a un punto (mi_punto_venta_id()
+-- no es null), solo veo las filas de ese punto. Si no está limitado (caso de
+-- casi todas las empresas), veo toda la empresa igual que siempre.
 create policy "ver mis ventas" on ventas
-  for all using (empresa_id = mi_empresa_id() or es_admin());
+  for all using (
+    (empresa_id = mi_empresa_id()
+      and (mi_punto_venta_id() is null or punto_venta_id = mi_punto_venta_id()))
+    or es_admin()
+  );
 
 create policy "ver mi crm" on crm_contactos
   for all using (empresa_id = mi_empresa_id() or es_admin());
 
 create policy "ver mi inventario" on inventario_items
-  for all using (empresa_id = mi_empresa_id() or es_admin());
+  for all using (
+    (empresa_id = mi_empresa_id()
+      and (mi_punto_venta_id() is null or punto_venta_id = mi_punto_venta_id()))
+    or es_admin()
+  );
 
 create policy "ver mis proveedores" on proveedores
   for all using (empresa_id = mi_empresa_id() or es_admin());
@@ -1209,7 +1261,8 @@ create or replace function registrar_venta(
   p_items jsonb,                 -- ej. [{"item_id":"...","cantidad":1,"precio_unitario":20000,"promocion_id":null,"descuento_aplicado":0}, ...]
                                   -- o, sin catálogo (empresa sin Inventario): [{"nombre_libre":"Camisa talla M","cantidad":1,"precio_unitario":45000,"costo_unitario":20000}, ...]
   p_fecha timestamptz default null,  -- si la persona cambió la fecha/hora sugerida; null = usar el momento actual
-  p_metodo_pago text default null    -- uno de los valores en empresas.metodos_pago_disponibles
+  p_metodo_pago text default null,   -- uno de los valores en empresas.metodos_pago_disponibles
+  p_punto_venta_id uuid default null -- solo si la empresa usa puntos_venta; null para el resto
 )
 returns uuid
 language plpgsql
@@ -1259,8 +1312,8 @@ begin
   from jsonb_array_elements(p_items) as item;
 
   -- 3. Crear la venta
-  insert into ventas (empresa_id, monto, contacto_id, cliente_nombre, atributos, fecha, metodo_pago)
-  values (p_empresa_id, v_monto_total, v_contacto_id, p_cliente_nombre, p_atributos_venta, coalesce(p_fecha, now()), p_metodo_pago)
+  insert into ventas (empresa_id, punto_venta_id, monto, contacto_id, cliente_nombre, atributos, fecha, metodo_pago)
+  values (p_empresa_id, p_punto_venta_id, v_monto_total, v_contacto_id, p_cliente_nombre, p_atributos_venta, coalesce(p_fecha, now()), p_metodo_pago)
   returning id into v_venta_id;
 
   -- 4. Agregar cada producto o servicio vendido, con su promoción si aplica
