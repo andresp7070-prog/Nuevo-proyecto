@@ -7,7 +7,7 @@ const NOMBRE_MODULO: Record<string, string> = {
   crm: "CRM",
   inventario: "Inventario",
   pyg: "Estado P y G",
-  insights: "Insights",
+  insights: "Panel de control",
   promociones: "Promociones",
 };
 

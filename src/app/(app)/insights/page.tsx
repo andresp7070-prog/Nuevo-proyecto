@@ -47,6 +47,7 @@ type FilaPerfilCliente = {
   contacto_id: string;
   ultima_compra: string;
   dias_promedio_entre_compras: number | null;
+  ticket_medio: number | null;
 };
 
 type Contacto = {
@@ -316,7 +317,7 @@ async function ContenidoInsights({
     supabase.from("inventario_items").select("id, nombre").eq("empresa_id", empresaId).order("nombre"),
     supabase
       .from("vista_perfil_cliente")
-      .select("contacto_id, ultima_compra, dias_promedio_entre_compras")
+      .select("contacto_id, ultima_compra, dias_promedio_entre_compras, ticket_medio")
       .eq("empresa_id", empresaId),
     supabase.from("crm_contactos").select("id, nombre").eq("empresa_id", empresaId),
   ]);
@@ -588,20 +589,26 @@ async function ContenidoInsights({
   const ingresosProductosActual = porProducto.reduce((s, p) => s + p.ingresos, 0);
   const categoriaIngresosActual = porCategoria.reduce((s, c) => s + c.ingresos, 0);
 
-  // ---- Insights: solo lo que cruza un umbral ----
-  type Insight = { titulo: string; detalle: string };
+  // ---- Insights: solo lo que cruza un umbral, ordenados por cuánta plata
+  // representan — para que lo que más importa quede arriba, no lo primero
+  // que se calculó. El "impacto" siempre combina al menos dos señales (ej.
+  // qué tan grave + qué tan grande en ventas), nunca es solo un porcentaje
+  // aislado.
+  type Insight = { titulo: string; detalle: string; impacto: number };
   const insights: Insight[] = [];
 
   if (mejorDiaDestaca && mejorDia) {
     insights.push({
       titulo: `Vendes más los ${mejorDia.dia}`,
       detalle: `Promedias ${formatoMoneda(mejorDia.promedio)} ese día, contra ${formatoMoneda(promedioGeneral)} en un día cualquiera.`,
+      impacto: (mejorDia.promedio - promedioGeneral) * mejorDia.diasConVenta,
     });
   }
   if (peorDiaDestaca && peorDia) {
     insights.push({
       titulo: `Vendes menos los ${peorDia.dia}`,
       detalle: `Promedias ${formatoMoneda(peorDia.promedio)} ese día, contra ${formatoMoneda(promedioGeneral)} en un día cualquiera.`,
+      impacto: (promedioGeneral - peorDia.promedio) * peorDia.diasConVenta,
     });
   }
 
@@ -611,13 +618,18 @@ async function ContenidoInsights({
       insights.push({
         titulo: diferencia > 0 ? "Vendes más en festivos" : "Vendes menos en festivos",
         detalle: `Promedias ${formatoMoneda(promedioFestivo)} en festivos, contra ${formatoMoneda(promedioNoFestivo)} en un día normal.`,
+        impacto: Math.abs(promedioFestivo - promedioNoFestivo) * festivos.length,
       });
     }
   }
 
+  // Margen bajo, pero pesado por cuánto vende ese producto: un margen
+  // terrible en algo que casi no se vende importa menos que un margen
+  // apenas bajo en el producto que más factura.
   const productosMargenBajo = porProducto
     .filter((p) => p.ingresos > 0 && p.margen_porcentaje < UMBRAL_MARGEN_BAJO)
-    .sort((a, b) => a.margen_porcentaje - b.margen_porcentaje)
+    .map((p) => ({ ...p, impacto: p.ingresos * ((UMBRAL_MARGEN_BAJO - p.margen_porcentaje) / 100) }))
+    .sort((a, b) => b.impacto - a.impacto)
     .slice(0, 3);
 
   for (const p of productosMargenBajo) {
@@ -625,8 +637,9 @@ async function ContenidoInsights({
       titulo: `Margen bajo en "${p.nombre}"`,
       detalle:
         p.margen_porcentaje < 0
-          ? `Lo estás vendiendo con pérdida: ${p.margen_porcentaje}% de margen.`
-          : `Solo ${p.margen_porcentaje}% de margen — revisa su costo o precio de venta.`,
+          ? `Lo estás vendiendo con pérdida: ${p.margen_porcentaje}% de margen, y ya factura ${formatoMoneda(p.ingresos)}.`
+          : `Solo ${p.margen_porcentaje}% de margen — revisa su costo o precio de venta. Factura ${formatoMoneda(p.ingresos)}.`,
+      impacto: p.impacto,
     });
   }
 
@@ -637,10 +650,14 @@ async function ContenidoInsights({
       insights.push({
         titulo: `La utilidad bajó en ${etiquetaMes(ultimo.mes)}`,
         detalle: `Utilidad neta de ${formatoMoneda(ultimo.utilidad_neta)}, contra ${formatoMoneda(anterior.utilidad_neta)} en ${etiquetaMes(anterior.mes)}.`,
+        impacto: anterior.utilidad_neta - ultimo.utilidad_neta,
       });
     }
   }
 
+  // Clientes en riesgo, pesados por lo que gastan: un cliente que compra
+  // seguido pero deja poca plata importa menos que uno de ticket alto que
+  // ya lleva varias compras "perdidas" sin volver.
   const hoy = new Date();
   const clientesEnRiesgo = perfilesCliente
     .filter((p) => p.dias_promedio_entre_compras !== null)
@@ -648,30 +665,31 @@ async function ContenidoInsights({
       const diasDesdeUltima = Math.floor(
         (hoy.getTime() - new Date(p.ultima_compra).getTime()) / (1000 * 60 * 60 * 24),
       );
-      return { ...p, diasDesdeUltima };
+      const diasPromedio = p.dias_promedio_entre_compras ?? 1;
+      const visitasPerdidas = Math.floor(diasDesdeUltima / diasPromedio);
+      return { ...p, diasDesdeUltima, impacto: (p.ticket_medio ?? 0) * Math.max(1, visitasPerdidas) };
     })
     .filter((p) => p.diasDesdeUltima > (p.dias_promedio_entre_compras ?? 0))
-    .sort(
-      (a, b) =>
-        b.diasDesdeUltima / (b.dias_promedio_entre_compras ?? 1) -
-        a.diasDesdeUltima / (a.dias_promedio_entre_compras ?? 1),
-    )
+    .sort((a, b) => b.impacto - a.impacto)
     .slice(0, 5);
 
   for (const c of clientesEnRiesgo) {
     const nombre = nombrePorContacto.get(c.contacto_id) ?? "Cliente";
     insights.push({
       titulo: `${nombre} no ha vuelto a comprar`,
-      detalle: `Compra en promedio cada ${Math.round(c.dias_promedio_entre_compras ?? 0)} días, y ya lleva ${c.diasDesdeUltima} sin comprar.`,
+      detalle: `Compra en promedio cada ${Math.round(c.dias_promedio_entre_compras ?? 0)} días con un ticket de ${formatoMoneda(c.ticket_medio ?? 0)}, y ya lleva ${c.diasDesdeUltima} sin comprar.`,
+      impacto: c.impacto,
     });
   }
+
+  insights.sort((a, b) => b.impacto - a.impacto);
 
   const hayComparacion = Boolean(rango);
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-lg font-semibold text-gray-900">Insights</h1>
+        <h1 className="text-lg font-semibold text-gray-900">Panel de control</h1>
         <p className="mt-1 text-sm text-gray-500">
           Primero el panorama general, y debajo lo que vale la pena señalar de tus datos reales.
         </p>
@@ -809,6 +827,7 @@ async function ContenidoInsights({
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Insights encontrados</h2>
+        <p className="mb-3 text-xs text-gray-400">Ordenados por cuánta plata representan, no por orden de cálculo.</p>
         {insights.length === 0 ? (
           <p className="text-sm text-gray-400">
             Todavía no hay suficientes datos, o todo está dentro de lo normal — no hay nada que
@@ -818,7 +837,14 @@ async function ContenidoInsights({
           <ul className="space-y-2">
             {insights.map((insight, i) => (
               <li key={i} className="rounded-xl border-2 border-gray-200 p-3">
-                <p className="text-sm font-medium text-gray-900">{insight.titulo}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium text-gray-900">{insight.titulo}</p>
+                  {insight.impacto > 0 && (
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                      ≈ {formatoMonedaCorta(insight.impacto)}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">{insight.detalle}</p>
               </li>
             ))}

@@ -9,7 +9,7 @@ const modulos = [
   { nombre: "CRM", href: "/crm", slug: "crm" },
   { nombre: "Inventario", href: "/inventario", slug: "inventario" },
   { nombre: "Estado P y G", href: "/pyg", slug: "pyg" },
-  { nombre: "Insights", href: "/insights", slug: "insights" },
+  { nombre: "Panel de control", href: "/insights", slug: "insights" },
   { nombre: "Promociones", href: "/promociones", slug: "promociones" },
 ];
 
