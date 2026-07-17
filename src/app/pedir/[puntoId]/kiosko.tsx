@@ -268,7 +268,7 @@ export function Kiosko({
                 >
                   {p.fotoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.fotoUrl} alt={p.nombre} className="h-full w-full rounded-xl object-cover" />
+                    <img src={p.fotoUrl} alt={p.nombre} className="h-full w-full rounded-xl object-contain p-1" />
                   ) : (
                     <IconoTaza />
                   )}

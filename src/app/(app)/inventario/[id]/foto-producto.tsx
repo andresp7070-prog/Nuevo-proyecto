@@ -99,7 +99,7 @@ export function FotoProducto({
         <img
           src={urlMostrada}
           alt="Foto del producto"
-          className="h-24 w-24 rounded-xl border border-gray-200 object-cover"
+          className="h-24 w-24 rounded-xl border border-gray-200 bg-gray-50 object-contain p-1"
         />
       ) : (
         <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-dashed border-gray-300 text-xs text-gray-400">
