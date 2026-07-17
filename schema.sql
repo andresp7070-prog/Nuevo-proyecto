@@ -689,31 +689,36 @@ for each row execute function registrar_gasto_compra();
 -- Usa el costo congelado en cada venta (no el costo actual). Respeta
 -- Row Level Security automáticamente: cada empresa solo ve su propia fila.
 -- ------------------------------------------------------------
+-- punto_venta_id se incluye en cada CTE y se junta con "is not distinct
+-- from" en vez de "=" — así una empresa sin puntos de venta (punto_venta_id
+-- siempre null en todas sus filas) sigue calzando null con null, y no se
+-- rompe el cálculo de nadie que no use puntos de venta.
 create or replace view vista_estado_resultados as
 with periodos as (
-  select empresa_id, date_trunc('month', fecha) as mes from ventas
+  select empresa_id, punto_venta_id, date_trunc('month', fecha) as mes from ventas
   union
-  select empresa_id, date_trunc('month', fecha) as mes from finanzas_movimientos
+  select empresa_id, punto_venta_id, date_trunc('month', fecha) as mes from finanzas_movimientos
 ),
 ventas_mes as (
-  select empresa_id, date_trunc('month', fecha) as mes, sum(monto) as ingresos
-  from ventas group by 1, 2
+  select empresa_id, punto_venta_id, date_trunc('month', fecha) as mes, sum(monto) as ingresos
+  from ventas group by 1, 2, 3
 ),
 costo_ventas_mes as (
-  select v.empresa_id, date_trunc('month', v.fecha) as mes,
+  select v.empresa_id, v.punto_venta_id, date_trunc('month', v.fecha) as mes,
     sum(vi.cantidad * coalesce(vi.costo_unitario, 0)) as costo_ventas
   from ventas v
   join ventas_items vi on vi.venta_id = v.id
-  group by 1, 2
+  group by 1, 2, 3
 ),
 otros_mes as (
-  select empresa_id, date_trunc('month', fecha) as mes,
+  select empresa_id, punto_venta_id, date_trunc('month', fecha) as mes,
     sum(case when tipo = 'ingreso' then monto else 0 end) as ingresos_otros,
     sum(case when tipo = 'gasto' then monto else 0 end) as gastos_operacionales
-  from finanzas_movimientos group by 1, 2
+  from finanzas_movimientos group by 1, 2, 3
 )
 select
   p.empresa_id,
+  p.punto_venta_id,
   p.mes,
   coalesce(vm.ingresos, 0) as ingresos_por_ventas,
   coalesce(cv.costo_ventas, 0) as costo_de_ventas,
@@ -724,8 +729,11 @@ select
    + coalesce(om.ingresos_otros, 0) - coalesce(om.gastos_operacionales, 0)) as utilidad_neta
 from periodos p
 left join ventas_mes vm on vm.empresa_id = p.empresa_id and vm.mes = p.mes
+  and vm.punto_venta_id is not distinct from p.punto_venta_id
 left join costo_ventas_mes cv on cv.empresa_id = p.empresa_id and cv.mes = p.mes
-left join otros_mes om on om.empresa_id = p.empresa_id and om.mes = p.mes;
+  and cv.punto_venta_id is not distinct from p.punto_venta_id
+left join otros_mes om on om.empresa_id = p.empresa_id and om.mes = p.mes
+  and om.punto_venta_id is not distinct from p.punto_venta_id;
 
 -- ------------------------------------------------------------
 -- Pasivos y deudas por pagar

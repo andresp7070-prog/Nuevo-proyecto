@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PuntoSelector } from "./punto-selector";
+import type { PuntoVenta } from "@/lib/puntos";
 
 const modulos = [
   { nombre: "Resumen", href: "/resumen", slug: null },
@@ -54,10 +56,18 @@ export function Sidebar({
   modulosActivos,
   rolEmpresa,
   esAdmin = false,
+  puntosVenta = [],
+  puntoSeleccionado = null,
+  mostrarSelectorPunto = false,
+  puntoFijoNombre = null,
 }: {
   modulosActivos: string[];
   rolEmpresa: "administrador" | "vendedor";
   esAdmin?: boolean;
+  puntosVenta?: PuntoVenta[];
+  puntoSeleccionado?: string | null;
+  mostrarSelectorPunto?: boolean;
+  puntoFijoNombre?: string | null;
 }) {
   const pathname = usePathname();
   const esVendedor = rolEmpresa === "vendedor";
@@ -110,6 +120,19 @@ export function Sidebar({
           <LogoCompass className="h-9 w-9" />
           <span className="text-4xl font-bold tracking-tight text-gray-900">Datum</span>
         </div>
+
+        {mostrarSelectorPunto && (
+          <div className="mb-3">
+            <PuntoSelector puntos={puntosVenta} seleccionado={puntoSeleccionado} />
+          </div>
+        )}
+        {!mostrarSelectorPunto && puntoFijoNombre && (
+          <div className="mb-3 px-3 py-2">
+            <p className="text-xs font-medium text-gray-400">Punto de venta</p>
+            <p className="text-sm text-gray-700">{puntoFijoNombre}</p>
+          </div>
+        )}
+
         <ul className="space-y-1">
           {habilitados.map((modulo) => {
             const activo = pathname === modulo.href || pathname.startsWith(`${modulo.href}/`);

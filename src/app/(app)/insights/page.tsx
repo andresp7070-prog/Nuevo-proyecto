@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { requerirModulo } from "@/lib/empresa";
+import { obtenerContextoPunto } from "@/lib/puntos";
 import { primeraMayuscula } from "@/lib/texto";
 import { calcularRango, type Periodo } from "@/lib/periodos";
 import {
@@ -300,7 +301,7 @@ async function ContenidoInsights({
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("empresa_id")
+    .select("empresa_id, punto_venta_id")
     .eq("id", user.id)
     .single();
 
@@ -312,6 +313,15 @@ async function ContenidoInsights({
     );
   }
   const empresaId = perfil.empresa_id;
+
+  // El punto de venta se elige desde el selector de la barra lateral (una
+  // sola vez para toda la sesión), no con un filtro propio de esta página —
+  // así queda consistente con Ventas, Inventario y P y G.
+  const { puntoSeleccionado: puntoVentaFiltro } = await obtenerContextoPunto(
+    supabase,
+    empresaId,
+    perfil.punto_venta_id,
+  );
 
   const [{ data: productosData }, { data: perfilesClienteData }, { data: contactosData }] = await Promise.all([
     supabase.from("inventario_items").select("id, nombre").eq("empresa_id", empresaId).order("nombre"),
@@ -327,7 +337,7 @@ async function ContenidoInsights({
   const contactos = (contactosData ?? []) as Contacto[];
   const nombrePorContacto = new Map(contactos.map((c) => [c.id, c.nombre]));
 
-  const sinFiltros = !rango && !diaSemanaFiltro && !productoFiltro;
+  const sinFiltros = !rango && !diaSemanaFiltro && !productoFiltro && !puntoVentaFiltro;
 
   let ventasPorDia: FilaVentaDia[];
   let porMes: FilaMes[];
@@ -390,6 +400,7 @@ async function ContenidoInsights({
       .lt("ventas.fecha", `${sumarDiasIso(hastaAmplio, 1)}T00:00:00`);
 
     if (productoFiltro) query = query.eq("item_id", productoFiltro);
+    if (puntoVentaFiltro) query = query.eq("ventas.punto_venta_id", puntoVentaFiltro);
 
     const [{ data: filasRawData }, { data: festivosData }] = await Promise.all([
       query,
