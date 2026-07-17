@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { primeraMayuscula } from "@/lib/texto";
 import { obtenerContextoPunto } from "@/lib/puntos";
 import { PygTabs } from "./pyg-tabs";
+import { SelectorMesPyg } from "./selector-mes";
 import { DescargarCsv } from "@/components/descargar-csv";
 import { PagoRapidoDeuda } from "./pago-rapido-deuda";
 
@@ -44,12 +44,6 @@ type FilaProducto = FilaCategoria & {
 
 function formatoMoneda(valor: number | null | undefined) {
   return (valor ?? 0).toLocaleString("es-CO", { style: "currency", currency: "COP" });
-}
-
-function etiquetaMes(mes: string) {
-  return primeraMayuscula(
-    new Date(mes).toLocaleDateString("es-CO", { month: "long", year: "numeric" }),
-  );
 }
 
 function inicioMesActual() {
@@ -152,7 +146,7 @@ export default async function PygPage({
       utilidad_neta: 0,
     } as FilaResultados);
 
-  const mesesDisponibles = filas.length > 0 ? filas : [{ ...fila, mes: mesSeleccionado }];
+  const mesesConDatos = filas.map((f) => f.mes.slice(0, 7));
 
   const { data: pasivosData } = await supabase
     .from("pasivos")
@@ -223,21 +217,7 @@ export default async function PygPage({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {mesesDisponibles.map((f) => (
-          <Link
-            key={f.mes}
-            href={`/pyg?mes=${f.mes.slice(0, 10)}`}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
-              f.mes.slice(0, 7) === mesSeleccionado.slice(0, 7)
-                ? "bg-accent text-white"
-                : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            {etiquetaMes(f.mes)}
-          </Link>
-        ))}
-      </div>
+      <SelectorMesPyg mesesConDatos={mesesConDatos} mesSeleccionado={mesSeleccionado} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-gray-200 p-4">
