@@ -3,12 +3,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { obtenerContextoPunto } from "@/lib/puntos";
 import { PygTabs } from "./pyg-tabs";
-import { SelectorMesPyg } from "./selector-mes";
+import { SelectorRangoPyg } from "./selector-rango";
 import { DescargarCsv } from "@/components/descargar-csv";
 import { PagoRapidoDeuda } from "./pago-rapido-deuda";
 
 type FilaResultados = {
-  mes: string;
   ingresos_por_ventas: number;
   costo_de_ventas: number;
   utilidad_bruta: number;
@@ -46,17 +45,39 @@ function formatoMoneda(valor: number | null | undefined) {
   return (valor ?? 0).toLocaleString("es-CO", { style: "currency", currency: "COP" });
 }
 
-function inicioMesActual() {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), 1)).toISOString();
+function primerDiaMesActualIso() {
+  const hoy = new Date();
+  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function ultimoDiaMesActualIso() {
+  const hoy = new Date();
+  const ultimo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+  return `${ultimo.getFullYear()}-${String(ultimo.getMonth() + 1).padStart(2, "0")}-${String(ultimo.getDate()).padStart(2, "0")}`;
+}
+
+function sumarUnDiaIso(fechaIso: string) {
+  const d = new Date(`${fechaIso}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatoFechaCorta(fechaIso: string) {
+  return new Date(`${fechaIso}T00:00:00`).toLocaleDateString("es-CO", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 export default async function PygPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ desde?: string; hasta?: string }>;
 }) {
-  const { mes } = await searchParams;
+  const { desde: desdeParam, hasta: hastaParam } = await searchParams;
+  const desde = desdeParam || primerDiaMesActualIso();
+  const hasta = hastaParam || ultimoDiaMesActualIso();
 
   const supabase = await createClient();
   const {
@@ -85,68 +106,53 @@ export default async function PygPage({
   );
   const empresaUsaPuntos = puntosVenta.length > 0;
 
-  let resultadosQuery = supabase
-    .from("vista_estado_resultados")
-    .select(
-      "mes, punto_venta_id, ingresos_por_ventas, costo_de_ventas, utilidad_bruta, otros_ingresos, gastos_operacionales, utilidad_neta",
-    )
+  // El estado de resultados se calcula directo de las tablas crudas para el
+  // rango de fechas exacto elegido (con día, no solo mes) — la vista
+  // vista_estado_resultados solo agrupa por mes completo, así que no sirve
+  // para un rango arbitrario.
+  let itemsQuery = supabase
+    .from("ventas_items")
+    .select("cantidad, precio_unitario, costo_unitario, ventas!inner ( fecha, empresa_id, punto_venta_id )")
+    .eq("ventas.empresa_id", perfil.empresa_id)
+    .gte("ventas.fecha", `${desde}T00:00:00`)
+    .lt("ventas.fecha", `${sumarUnDiaIso(hasta)}T00:00:00`);
+
+  if (puntoSeleccionado) itemsQuery = itemsQuery.eq("ventas.punto_venta_id", puntoSeleccionado);
+
+  let finanzasQuery = supabase
+    .from("finanzas_movimientos")
+    .select("tipo, monto")
     .eq("empresa_id", perfil.empresa_id)
-    .order("mes", { ascending: false });
+    .gte("fecha", desde)
+    .lte("fecha", hasta);
 
-  if (puntoSeleccionado) resultadosQuery = resultadosQuery.eq("punto_venta_id", puntoSeleccionado);
+  if (puntoSeleccionado) finanzasQuery = finanzasQuery.eq("punto_venta_id", puntoSeleccionado);
 
-  const { data: filasResultadosRaw } = await resultadosQuery;
+  const [{ data: itemsData }, { data: finanzasData }] = await Promise.all([itemsQuery, finanzasQuery]);
 
-  // Con un punto específico seleccionado, la vista ya trae una sola fila por
-  // mes (filtrada). Con "todos los puntos", la vista ahora puede traer una
-  // fila por cada combinación mes+punto — hay que sumarlas para volver a
-  // tener el total combinado de toda la empresa, como antes de que existieran
-  // los puntos de venta.
-  const filasCrudas = (filasResultadosRaw ?? []) as (FilaResultados & {
-    punto_venta_id: string | null;
-  })[];
-
-  let filas: FilaResultados[];
-  if (puntoSeleccionado) {
-    filas = filasCrudas;
-  } else {
-    const combinadoPorMes = new Map<string, FilaResultados>();
-    for (const f of filasCrudas) {
-      const clave = f.mes.slice(0, 7);
-      const acumulado = combinadoPorMes.get(clave) ?? {
-        mes: f.mes,
-        ingresos_por_ventas: 0,
-        costo_de_ventas: 0,
-        utilidad_bruta: 0,
-        otros_ingresos: 0,
-        gastos_operacionales: 0,
-        utilidad_neta: 0,
-      };
-      acumulado.ingresos_por_ventas += Number(f.ingresos_por_ventas);
-      acumulado.costo_de_ventas += Number(f.costo_de_ventas);
-      acumulado.utilidad_bruta += Number(f.utilidad_bruta);
-      acumulado.otros_ingresos += Number(f.otros_ingresos);
-      acumulado.gastos_operacionales += Number(f.gastos_operacionales);
-      acumulado.utilidad_neta += Number(f.utilidad_neta);
-      combinadoPorMes.set(clave, acumulado);
-    }
-    filas = Array.from(combinadoPorMes.values()).sort((a, b) => b.mes.localeCompare(a.mes));
+  let ingresos_por_ventas = 0;
+  let costo_de_ventas = 0;
+  for (const item of itemsData ?? []) {
+    ingresos_por_ventas += Number(item.cantidad) * Number(item.precio_unitario);
+    costo_de_ventas += Number(item.cantidad) * Number(item.costo_unitario ?? 0);
   }
 
-  const mesSeleccionado = mes ?? filas[0]?.mes ?? inicioMesActual();
-  const fila =
-    filas.find((f) => f.mes.slice(0, 7) === mesSeleccionado.slice(0, 7)) ??
-    ({
-      mes: mesSeleccionado,
-      ingresos_por_ventas: 0,
-      costo_de_ventas: 0,
-      utilidad_bruta: 0,
-      otros_ingresos: 0,
-      gastos_operacionales: 0,
-      utilidad_neta: 0,
-    } as FilaResultados);
+  let otros_ingresos = 0;
+  let gastos_operacionales = 0;
+  for (const mov of finanzasData ?? []) {
+    if (mov.tipo === "ingreso") otros_ingresos += Number(mov.monto);
+    else gastos_operacionales += Number(mov.monto);
+  }
 
-  const mesesConDatos = filas.map((f) => f.mes.slice(0, 7));
+  const utilidad_bruta = ingresos_por_ventas - costo_de_ventas;
+  const fila: FilaResultados = {
+    ingresos_por_ventas,
+    costo_de_ventas,
+    utilidad_bruta,
+    otros_ingresos,
+    gastos_operacionales,
+    utilidad_neta: utilidad_bruta + otros_ingresos - gastos_operacionales,
+  };
 
   const { data: pasivosData } = await supabase
     .from("pasivos")
@@ -217,7 +223,12 @@ export default async function PygPage({
         </div>
       </div>
 
-      <SelectorMesPyg mesesConDatos={mesesConDatos} mesSeleccionado={mesSeleccionado} />
+      <div>
+        <SelectorRangoPyg desde={desde} hasta={hasta} />
+        <p className="mt-2 text-xs text-gray-400">
+          Mostrando del {formatoFechaCorta(desde)} al {formatoFechaCorta(hasta)}
+        </p>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-gray-200 p-4">
