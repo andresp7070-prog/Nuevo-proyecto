@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { obtenerContextoPunto } from "@/lib/puntos";
 import { VentasTabs } from "./ventas-tabs";
 import { DescargarCsv } from "@/components/descargar-csv";
 
@@ -43,7 +44,7 @@ export default async function VentasPage({
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("empresa_id")
+    .select("empresa_id, punto_venta_id")
     .eq("id", user.id)
     .single();
 
@@ -55,13 +56,23 @@ export default async function VentasPage({
     );
   }
 
-  const { data } = await supabase
+  const { puntoSeleccionado } = await obtenerContextoPunto(
+    supabase,
+    perfil.empresa_id,
+    perfil.punto_venta_id,
+  );
+
+  let query = supabase
     .from("ventas")
     .select(
       "id, fecha, monto, cliente_nombre, metodo_pago, ventas_items ( cantidad, nombre_libre, inventario_items ( nombre ) )",
     )
     .eq("empresa_id", perfil.empresa_id)
     .order("fecha", { ascending: false });
+
+  if (puntoSeleccionado) query = query.eq("punto_venta_id", puntoSeleccionado);
+
+  const { data } = await query;
 
   const ventas = (data ?? []) as unknown as Venta[];
 

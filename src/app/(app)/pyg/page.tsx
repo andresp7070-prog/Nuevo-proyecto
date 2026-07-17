@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { primeraMayuscula } from "@/lib/texto";
+import { obtenerContextoPunto } from "@/lib/puntos";
 import { PygTabs } from "./pyg-tabs";
 import { DescargarCsv } from "@/components/descargar-csv";
 import { PagoRapidoDeuda } from "./pago-rapido-deuda";
@@ -71,7 +72,7 @@ export default async function PygPage({
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("empresa_id")
+    .select("empresa_id, punto_venta_id")
     .eq("id", user.id)
     .single();
 
@@ -83,15 +84,60 @@ export default async function PygPage({
     );
   }
 
-  const { data: filasResultados } = await supabase
+  const { puntoSeleccionado, puntosVenta } = await obtenerContextoPunto(
+    supabase,
+    perfil.empresa_id,
+    perfil.punto_venta_id,
+  );
+  const empresaUsaPuntos = puntosVenta.length > 0;
+
+  let resultadosQuery = supabase
     .from("vista_estado_resultados")
     .select(
-      "mes, ingresos_por_ventas, costo_de_ventas, utilidad_bruta, otros_ingresos, gastos_operacionales, utilidad_neta",
+      "mes, punto_venta_id, ingresos_por_ventas, costo_de_ventas, utilidad_bruta, otros_ingresos, gastos_operacionales, utilidad_neta",
     )
     .eq("empresa_id", perfil.empresa_id)
     .order("mes", { ascending: false });
 
-  const filas = (filasResultados ?? []) as FilaResultados[];
+  if (puntoSeleccionado) resultadosQuery = resultadosQuery.eq("punto_venta_id", puntoSeleccionado);
+
+  const { data: filasResultadosRaw } = await resultadosQuery;
+
+  // Con un punto específico seleccionado, la vista ya trae una sola fila por
+  // mes (filtrada). Con "todos los puntos", la vista ahora puede traer una
+  // fila por cada combinación mes+punto — hay que sumarlas para volver a
+  // tener el total combinado de toda la empresa, como antes de que existieran
+  // los puntos de venta.
+  const filasCrudas = (filasResultadosRaw ?? []) as (FilaResultados & {
+    punto_venta_id: string | null;
+  })[];
+
+  let filas: FilaResultados[];
+  if (puntoSeleccionado) {
+    filas = filasCrudas;
+  } else {
+    const combinadoPorMes = new Map<string, FilaResultados>();
+    for (const f of filasCrudas) {
+      const clave = f.mes.slice(0, 7);
+      const acumulado = combinadoPorMes.get(clave) ?? {
+        mes: f.mes,
+        ingresos_por_ventas: 0,
+        costo_de_ventas: 0,
+        utilidad_bruta: 0,
+        otros_ingresos: 0,
+        gastos_operacionales: 0,
+        utilidad_neta: 0,
+      };
+      acumulado.ingresos_por_ventas += Number(f.ingresos_por_ventas);
+      acumulado.costo_de_ventas += Number(f.costo_de_ventas);
+      acumulado.utilidad_bruta += Number(f.utilidad_bruta);
+      acumulado.otros_ingresos += Number(f.otros_ingresos);
+      acumulado.gastos_operacionales += Number(f.gastos_operacionales);
+      acumulado.utilidad_neta += Number(f.utilidad_neta);
+      combinadoPorMes.set(clave, acumulado);
+    }
+    filas = Array.from(combinadoPorMes.values()).sort((a, b) => b.mes.localeCompare(a.mes));
+  }
 
   const mesSeleccionado = mes ?? filas[0]?.mes ?? inicioMesActual();
   const fila =
@@ -259,6 +305,13 @@ export default async function PygPage({
           )}
         </div>
       </div>
+
+      {empresaUsaPuntos && (
+        <p className="text-xs text-gray-400">
+          Las tablas de utilidad por categoría y por producto, abajo, siempre muestran el total de
+          todos los puntos combinados — todavía no se pueden filtrar por punto.
+        </p>
+      )}
 
       <div className="rounded-xl border border-gray-200 p-4">
         <div className="mb-4 flex items-center justify-between">

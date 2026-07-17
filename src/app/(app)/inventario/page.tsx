@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { calcularDiasRestantes } from "@/lib/inventario";
 import { firmarFotoUrls } from "@/lib/fotos";
+import { obtenerContextoPunto } from "@/lib/puntos";
 import { DirectorioInventario } from "./directorio-inventario";
 
 export default async function InventarioPage({
@@ -19,7 +20,7 @@ export default async function InventarioPage({
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("empresa_id")
+    .select("empresa_id, punto_venta_id")
     .eq("id", user.id)
     .single();
 
@@ -31,13 +32,23 @@ export default async function InventarioPage({
     );
   }
 
-  const { data: items } = await supabase
+  const { puntoSeleccionado } = await obtenerContextoPunto(
+    supabase,
+    perfil.empresa_id,
+    perfil.punto_venta_id,
+  );
+
+  let itemsQuery = supabase
     .from("inventario_items")
     .select(
       "id, nombre, categoria, unidad, cantidad, costo, precio_venta, foto_path, marca:atributos->>marca",
     )
     .eq("empresa_id", perfil.empresa_id)
     .order("nombre");
+
+  if (puntoSeleccionado) itemsQuery = itemsQuery.eq("punto_venta_id", puntoSeleccionado);
+
+  const { data: items } = await itemsQuery;
 
   const fotoUrlsPorPath = await firmarFotoUrls(
     supabase,
