@@ -77,6 +77,8 @@ export function NuevoProductoForm({
   const [categoria, setCategoria] = useState("");
   const [mostrarSugerenciasCategoria, setMostrarSugerenciasCategoria] = useState(false);
 
+  const [marca, setMarca] = useState("");
+
   const [unidad, setUnidad] = useState("unidad");
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState("");
@@ -171,6 +173,7 @@ export function NuevoProductoForm({
     setNombre("");
     setItemExistente(null);
     setCategoria("");
+    setMarca("");
     setUnidad("unidad");
     setCantidad("");
     setCosto("");
@@ -287,6 +290,14 @@ export function NuevoProductoForm({
         reiniciarFormulario();
         router.refresh();
       } else {
+        const atributos: Record<string, unknown> = {};
+        if (volverAReceta && unidad !== "unidad" && contenidoPorUnidad.trim()) {
+          atributos.contenido_por_unidad = Number(contenidoPorUnidad);
+        }
+        if (marca.trim()) {
+          atributos.marca = primeraMayuscula(marca.trim());
+        }
+
         const resultado = await crearProducto({
           nombre: nombreFinal,
           categoria: categoriaFinal,
@@ -298,10 +309,7 @@ export function NuevoProductoForm({
           sku: sku.trim() || null,
           esInsumo,
           puntoVentaId: usaPuntos ? puntoVentaId || null : null,
-          atributos:
-            volverAReceta && unidad !== "unidad" && contenidoPorUnidad.trim()
-              ? { contenido_por_unidad: Number(contenidoPorUnidad) }
-              : undefined,
+          atributos: Object.keys(atributos).length > 0 ? atributos : undefined,
         });
         if (resultado.error || !resultado.id) {
           setError(resultado.error ?? "No se pudo guardar el producto.");
@@ -429,6 +437,18 @@ export function NuevoProductoForm({
           ))}
         </ul>
       )}
+    </div>
+  );
+
+  const campoMarca = itemExistente ? null : (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">Marca (opcional)</label>
+      <input
+        value={marca}
+        onChange={(e) => setMarca(e.target.value)}
+        placeholder="Ej. Fabuloso, Familia"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+      />
     </div>
   );
 
@@ -705,6 +725,7 @@ export function NuevoProductoForm({
             {campoPrecioVenta}
             {campoNombre}
             {campoCategoria}
+            {campoMarca}
             {campoProveedor}
             {campoUnidad}
             {campoContenido}
@@ -719,6 +740,7 @@ export function NuevoProductoForm({
           {campoNombre}
           {campoSku}
           {campoCategoria}
+          {campoMarca}
           {campoProveedor}
           {campoUnidad}
           {campoCantidad}
