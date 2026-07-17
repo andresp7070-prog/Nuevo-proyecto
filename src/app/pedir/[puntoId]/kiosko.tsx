@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { SignOutButton } from "@/components/signout-button";
 import { registrarPedidoKiosko } from "./actions";
 
 type Producto = {
@@ -186,6 +187,10 @@ export function Kiosko({
               {nombrePunto} · pide aquí
             </p>
           </div>
+        </div>
+        {/* Discreto, para el personal — no pensado para que el cliente lo toque */}
+        <div className="opacity-40 hover:opacity-100">
+          <SignOutButton />
         </div>
       </header>
 
