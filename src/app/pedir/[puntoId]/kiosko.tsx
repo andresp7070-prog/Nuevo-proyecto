@@ -16,13 +16,26 @@ type Producto = {
 // (colores, y más adelante tipografía/logo) sin tocar el resto de la
 // pantalla, el día que el cliente confirme su identidad de marca real.
 const TEMA = {
-  fondo: "#FBF6EF",
   tinta: "#3B2A1E",
   tintaSuave: "#8A7460",
   acento: "#C9702D",
   acentoSuave: "#F1DABB",
   tarjeta: "#FFFFFF",
   borde: "#EAE0D2",
+};
+
+// Fondo amaderado (roble claro, veta vertical) armado con capas de
+// gradientes en vez de una imagen — así no depende de subir ni alojar
+// ningún archivo. Varias franjas superpuestas a distinto ancho y opacidad
+// imitan la veta irregular de la madera real.
+const FONDO_MADERA: React.CSSProperties = {
+  backgroundColor: "#D8B889",
+  backgroundImage: [
+    "repeating-linear-gradient(90deg, rgba(255,255,255,0.10) 0px, transparent 3px, transparent 6px, rgba(120,80,40,0.07) 8px, transparent 12px)",
+    "repeating-linear-gradient(90deg, rgba(140,95,50,0.10) 0px, transparent 2px, transparent 35px, rgba(140,95,50,0.06) 38px, transparent 70px)",
+    "repeating-linear-gradient(90deg, rgba(90,55,25,0.05) 0px, transparent 90px, rgba(90,55,25,0.05) 92px, transparent 160px)",
+    "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.04))",
+  ].join(", "),
 };
 
 function formatoMoneda(valor: number) {
@@ -173,7 +186,7 @@ export function Kiosko({
     return (
       <div
         className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
-        style={{ background: TEMA.fondo, color: TEMA.tinta }}
+        style={{ ...FONDO_MADERA, color: TEMA.tinta }}
       >
         <div
           className="mb-6 flex h-24 w-24 items-center justify-center rounded-full"
@@ -204,7 +217,7 @@ export function Kiosko({
   }
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: TEMA.fondo, color: TEMA.tinta }}>
+    <div className="flex min-h-screen flex-col" style={{ ...FONDO_MADERA, color: TEMA.tinta }}>
       <header className="flex items-center justify-between px-8 py-6">
         <div className="flex items-center gap-3">
           <IconoTaza />

@@ -105,8 +105,8 @@ export function Sidebar({
             })}
           </ul>
         </div>
-        <div className="flex items-center gap-2.5 px-3 text-base text-gray-400">
-          <LogoCompass className="h-6 w-6" />
+        <div className="flex items-center gap-1.5 px-3 text-[11px] whitespace-nowrap text-gray-300">
+          <LogoCompass className="h-3 w-3 shrink-0" />
           <span>Desarrollado por Datum</span>
         </div>
       </nav>
@@ -171,8 +171,8 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="flex items-center gap-2.5 px-3 text-base text-gray-400">
-        <LogoCompass className="h-6 w-6" />
+      <div className="flex items-center gap-1.5 px-3 text-[11px] whitespace-nowrap text-gray-300">
+        <LogoCompass className="h-3 w-3 shrink-0" />
         <span>Desarrollado por Datum</span>
       </div>
     </nav>
