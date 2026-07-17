@@ -8,6 +8,8 @@ import { normalizarUnidad, etiquetaUnidad } from "@/lib/unidades";
 import { DescargarCsv } from "@/components/descargar-csv";
 import { cargarInventarioInicial, type FilaImportacion } from "./actions";
 
+type PuntoVenta = { id: string; nombre: string };
+
 const COLUMNAS_ESPERADAS = [
   "nombre",
   "categoria",
@@ -44,10 +46,18 @@ function normalizarSiNo(textoLibre: string): { valor: boolean; reconocida: boole
   return { valor: false, reconocida: false };
 }
 
-export function ImportarInventarioForm() {
+export function ImportarInventarioForm({
+  puntosVenta = [],
+  puntoInicial = null,
+}: {
+  puntosVenta?: PuntoVenta[];
+  puntoInicial?: string | null;
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const usaPuntos = puntosVenta.length > 0;
 
+  const [puntoVentaId, setPuntoVentaId] = useState(puntoInicial ?? "");
   const [filas, setFilas] = useState<FilaPreview[]>([]);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
   const [nombreArchivo, setNombreArchivo] = useState<string | null>(null);
@@ -159,10 +169,16 @@ export function ImportarInventarioForm() {
 
   async function confirmar() {
     setError(null);
+
+    if (usaPuntos && !puntoVentaId) {
+      setError("Elige a qué punto de venta va este catálogo.");
+      return;
+    }
+
     setCargando(true);
     try {
       const filasValidas = filas.filter((fila) => fila.nombre !== "");
-      const resultado = await cargarInventarioInicial(filasValidas, reemplazar);
+      const resultado = await cargarInventarioInicial(filasValidas, reemplazar, usaPuntos ? puntoVentaId : null);
       if (resultado.error) {
         setError(resultado.error);
         return;
@@ -233,6 +249,27 @@ export function ImportarInventarioForm() {
           precio de venta, la vista previa lo marca como error porque no tiene lógica.
         </p>
       </div>
+
+      {usaPuntos && (
+        <div className="mb-4 rounded-xl border border-gray-200 p-4">
+          <label className="mb-1 block text-sm font-medium text-gray-900">Punto de venta *</label>
+          <select
+            value={puntoVentaId}
+            onChange={(e) => setPuntoVentaId(e.target.value)}
+            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          >
+            <option value="">Elige un punto...</option>
+            {puntosVenta.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-400">
+            Todo el archivo se carga a este punto — cada punto tiene su propio catálogo y stock.
+          </p>
+        </div>
+      )}
 
       <div className="mb-4 rounded-xl border border-gray-200 p-4">
         <p className="mb-2 text-sm font-medium text-gray-900">
@@ -368,7 +405,7 @@ export function ImportarInventarioForm() {
             <button
               type="button"
               onClick={confirmar}
-              disabled={cargando || filasValidas.length === 0}
+              disabled={cargando || filasValidas.length === 0 || (usaPuntos && !puntoVentaId)}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
             >
               {cargando ? "Importando..." : `Confirmar carga de ${filasValidas.length} producto(s)`}

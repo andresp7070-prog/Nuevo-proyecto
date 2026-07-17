@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { obtenerContextoPunto } from "@/lib/puntos";
 import { InventarioTabs } from "../inventario-tabs";
 import { ImportarInventarioForm } from "./importar-form";
 
@@ -24,10 +25,16 @@ export default async function ImportarInventarioPage() {
     );
   }
 
+  const { puntosVenta, puntoSeleccionado } = await obtenerContextoPunto(
+    supabase,
+    perfil.empresa_id,
+    null,
+  );
+
   return (
     <div>
       <InventarioTabs />
-      <ImportarInventarioForm />
+      <ImportarInventarioForm puntosVenta={puntosVenta} puntoInicial={puntoSeleccionado} />
     </div>
   );
 }

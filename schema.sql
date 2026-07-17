@@ -557,7 +557,8 @@ $$;
 create or replace function cargar_inventario_inicial(
   p_empresa_id uuid,
   p_items jsonb,  -- [{"nombre":"...","categoria":"...","unidad":"unidad","cantidad":10,"costo":1000,"precio_venta":2000,"es_insumo":false}, ...]
-  p_reemplazar boolean default false  -- true: el archivo reemplaza la cantidad de cada producto (carga inicial o recuento completo); false: suma a lo que ya hay (reabastecimiento)
+  p_reemplazar boolean default false,  -- true: el archivo reemplaza la cantidad de cada producto (carga inicial o recuento completo); false: suma a lo que ya hay (reabastecimiento)
+  p_punto_venta_id uuid default null   -- solo si la empresa usa puntos_venta; null para el resto
 )
 returns int
 language plpgsql
@@ -581,9 +582,13 @@ begin
     -- un insumo puro no se vende individualmente, así que nunca tiene precio de venta
     v_precio_venta := case when v_es_insumo then null else (v_item->>'precio_venta')::numeric end;
 
+    -- El mismo nombre puede existir en puntos distintos como filas separadas
+    -- (cada una con su propio stock) — "is not distinct from" trata null
+    -- como igual a null, para no romper a las empresas sin puntos de venta.
     select id into v_existente_id
     from inventario_items
     where empresa_id = p_empresa_id
+      and punto_venta_id is not distinct from p_punto_venta_id
       and lower(unaccent(nombre)) = lower(unaccent(v_item->>'nombre'))
     limit 1;
 
@@ -614,9 +619,10 @@ begin
       end if;
       v_item_id := v_existente_id;
     else
-      insert into inventario_items (empresa_id, nombre, categoria, unidad, cantidad, costo, precio_venta, es_insumo)
+      insert into inventario_items (empresa_id, punto_venta_id, nombre, categoria, unidad, cantidad, costo, precio_venta, es_insumo)
       values (
         p_empresa_id,
+        p_punto_venta_id,
         v_item->>'nombre',
         nullif(v_item->>'categoria', ''),
         coalesce(nullif(v_item->>'unidad', ''), 'unidad'),
