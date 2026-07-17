@@ -9,6 +9,7 @@ const PESTANAS = [
   { href: "/inventario/proveedores", etiqueta: "Proveedores" },
   { href: "/inventario/proyecciones", etiqueta: "Proyecciones" },
   { href: "/inventario/importar", etiqueta: "Importar" },
+  { href: "/inventario/fotos", etiqueta: "Fotos" },
 ];
 
 export function InventarioTabs() {
