@@ -718,7 +718,6 @@ otros_mes as (
 )
 select
   p.empresa_id,
-  p.punto_venta_id,
   p.mes,
   coalesce(vm.ingresos, 0) as ingresos_por_ventas,
   coalesce(cv.costo_ventas, 0) as costo_de_ventas,
@@ -726,7 +725,8 @@ select
   coalesce(om.ingresos_otros, 0) as otros_ingresos,
   coalesce(om.gastos_operacionales, 0) as gastos_operacionales,
   (coalesce(vm.ingresos, 0) - coalesce(cv.costo_ventas, 0)
-   + coalesce(om.ingresos_otros, 0) - coalesce(om.gastos_operacionales, 0)) as utilidad_neta
+   + coalesce(om.ingresos_otros, 0) - coalesce(om.gastos_operacionales, 0)) as utilidad_neta,
+  p.punto_venta_id
 from periodos p
 left join ventas_mes vm on vm.empresa_id = p.empresa_id and vm.mes = p.mes
   and vm.punto_venta_id is not distinct from p.punto_venta_id
