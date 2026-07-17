@@ -42,6 +42,12 @@ export default async function FichaProductoPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("empresa_id")
+    .eq("id", user.id)
+    .single();
+
   const { data: item } = await supabase
     .from("inventario_items")
     .select(
@@ -51,6 +57,7 @@ export default async function FichaProductoPage({
     .single();
 
   if (!item) notFound();
+  if (!perfil?.empresa_id) notFound();
 
   const proveedor = Array.isArray(item.proveedor) ? item.proveedor[0] : item.proveedor;
 
@@ -96,7 +103,7 @@ export default async function FichaProductoPage({
       <div className="rounded-xl border border-gray-200 p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            <FotoProducto itemId={item.id} fotoUrl={fotoUrl} />
+            <FotoProducto itemId={item.id} empresaId={perfil.empresa_id} fotoUrl={fotoUrl} />
             <div>
               <h1 className="text-lg font-semibold text-gray-900">{item.nombre}</h1>
               <p className="mt-0.5 font-mono text-xs text-gray-400">SKU: {item.sku ?? "—"}</p>
