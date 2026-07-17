@@ -6,7 +6,7 @@ import Link from "next/link";
 import { sinTildes, primeraMayuscula } from "@/lib/texto";
 import { UNIDADES } from "@/lib/unidades";
 import { CampoMoneda } from "@/components/campo-moneda";
-import { errorTamanoFoto } from "@/lib/fotos";
+import { comprimirImagen, TAMANO_MAXIMO_ORIGINAL_BYTES } from "@/lib/imagenes";
 import { RecetaLineas, type LineaRecetaValor } from "../receta-lineas";
 import { guardarReceta, subirFotoProducto } from "../[id]/actions";
 import { crearProducto, reabastecerProducto } from "./actions";
@@ -185,9 +185,10 @@ export function NuevoProductoForm({
 
   async function subirFotoSiHay(itemId: string): Promise<string | null> {
     if (!fotoFile) return null;
+    const archivo = await comprimirImagen(fotoFile);
     const formData = new FormData();
     formData.set("itemId", itemId);
-    formData.set("foto", fotoFile);
+    formData.set("foto", archivo);
     const resultado = await subirFotoProducto(formData);
     return resultado.error;
   }
@@ -508,14 +509,14 @@ export function NuevoProductoForm({
         accept="image/png,image/jpeg,image/webp"
         onChange={(e) => {
           const file = e.target.files?.[0] ?? null;
-          if (file) {
-            const errorValidacion = errorTamanoFoto(file);
-            if (errorValidacion) {
-              setErrorFoto(errorValidacion);
-              setFotoFile(null);
-              e.target.value = "";
-              return;
-            }
+          // La validación real de tamaño pasa después de comprimir, al
+          // guardar — la mayoría de las fotos de celular pesan varios MB de
+          // entrada pero terminan muy por debajo del límite ya comprimidas.
+          if (file && file.size > TAMANO_MAXIMO_ORIGINAL_BYTES) {
+            setErrorFoto("El archivo es demasiado grande — elige una foto más liviana.");
+            setFotoFile(null);
+            e.target.value = "";
+            return;
           }
           setErrorFoto(null);
           setFotoFile(file);

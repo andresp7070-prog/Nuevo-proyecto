@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { errorTamanoFoto } from "@/lib/fotos";
+import { comprimirImagen, TAMANO_MAXIMO_ORIGINAL_BYTES } from "@/lib/imagenes";
 import { actualizarFotoPath } from "./actions";
 
 const BUCKET = "inventario-fotos";
@@ -38,13 +39,18 @@ export function FotoProducto({
 
     void (async () => {
       try {
+        const archivo = await comprimirImagen(file);
+
+        const errorValidacion = errorTamanoFoto(archivo);
+        if (errorValidacion) throw new Error(errorValidacion);
+
         const supabase = createClient();
         const {
           data: { session },
         } = await supabase.auth.getSession();
         if (!session) throw new Error("No hay sesión activa — vuelve a iniciar sesión e intenta de nuevo.");
 
-        const extension = file.name.split(".").pop() ?? "jpg";
+        const extension = archivo.name.split(".").pop() ?? "jpg";
         const path = `${empresaId}/${itemId}/${Date.now()}.${extension}`;
         const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`;
 
@@ -53,7 +59,7 @@ export function FotoProducto({
           xhr.open("POST", url, true);
           xhr.setRequestHeader("Authorization", `Bearer ${session.access_token}`);
           xhr.setRequestHeader("apikey", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-          xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+          xhr.setRequestHeader("Content-Type", archivo.type || "application/octet-stream");
           xhr.setRequestHeader("x-upsert", "true");
           xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) setProgreso(Math.round((e.loaded / e.total) * 100));
@@ -66,7 +72,7 @@ export function FotoProducto({
             }
           };
           xhr.onerror = () => reject(new Error("Falló la conexión al subir la foto. Revisa tu internet e intenta de nuevo."));
-          xhr.send(file);
+          xhr.send(archivo);
         });
 
         const resultado = await actualizarFotoPath({ itemId, path });
@@ -120,9 +126,11 @@ export function FotoProducto({
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (!file) return;
-          const errorValidacion = errorTamanoFoto(file);
-          if (errorValidacion) {
-            setError(errorValidacion);
+          // El resto de la validación de tamaño pasa DESPUÉS de comprimir —
+          // la mayoría de las fotos de celular pesan varios MB de entrada
+          // pero terminan muy por debajo del límite una vez comprimidas.
+          if (file.size > TAMANO_MAXIMO_ORIGINAL_BYTES) {
+            setError("El archivo es demasiado grande — elige una foto más liviana.");
             if (inputRef.current) inputRef.current.value = "";
             return;
           }
