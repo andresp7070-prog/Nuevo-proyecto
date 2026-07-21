@@ -35,6 +35,13 @@ create table empresas (
   modulos_activos text[] default '{}',        -- ajuste manual sobre el plan
   pagina_entrada text not null default 'ventas'
     check (pagina_entrada in ('ventas','crm','inventario','pyg','insights')),  -- en qué módulo aterriza al iniciar sesión; lo decide el diagnóstico, no el cliente
+  -- 'ventas': el CRM se comporta como siempre — embudo fijo de 4 etapas, sin
+  -- pantalla de configuración, contactos que nacen casi todos ya cerrados
+  -- porque vienen de una venta (ej. Aseo Total, Café Mensajero). 'leads':
+  -- habilita "Configurar etapas" y las reglas de inactividad, para un
+  -- negocio que vive de cotizar/negociar antes de vender. Se activa a mano,
+  -- igual que modulos_activos y pagina_entrada — nunca lo decide el cliente.
+  crm_modo text not null default 'ventas' check (crm_modo in ('ventas','leads')),
   fecha_diagnostico date,
   -- Catálogo fijo de métodos de pago (igual para toda la plataforma); cada
   -- empresa activa cuáles acepta. Editable por ahora en la tabla de Supabase.

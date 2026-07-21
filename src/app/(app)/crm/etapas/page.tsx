@@ -14,7 +14,7 @@ export default async function EtapasCrmPage() {
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("empresa_id")
+    .select("empresa_id, empresas ( crm_modo )")
     .eq("id", user.id)
     .single();
 
@@ -25,6 +25,11 @@ export default async function EtapasCrmPage() {
       </p>
     );
   }
+
+  // La relación empresa_id -> empresas.id es uno-a-uno; Supabase la tipa como
+  // arreglo por falta de tipos generados, pero en tiempo de ejecución es un objeto.
+  const empresa = perfil.empresas as unknown as { crm_modo: string } | null;
+  if (empresa?.crm_modo !== "leads") redirect("/crm");
 
   const { data: etapas } = await supabase
     .from("crm_etapas")

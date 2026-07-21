@@ -19,9 +19,11 @@ type Etapa = { id: string; nombre: string; orden: number };
 export function DirectorioClientes({
   contactos,
   etapas,
+  mostrarConfigEtapas,
 }: {
   contactos: Contacto[];
   etapas: Etapa[];
+  mostrarConfigEtapas: boolean;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [etapaFiltro, setEtapaFiltro] = useState("todas");
@@ -62,12 +64,14 @@ export function DirectorioClientes({
             ]}
             nombreArchivo="clientes.csv"
           />
-          <Link
-            href="/crm/etapas"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-          >
-            Configurar etapas
-          </Link>
+          {mostrarConfigEtapas && (
+            <Link
+              href="/crm/etapas"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Configurar etapas
+            </Link>
+          )}
           <Link
             href="/crm/nuevo"
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
