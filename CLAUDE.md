@@ -152,6 +152,10 @@ Descuentos y promociones va a ser su propio módulo — falta decidir en qué pl
 ## Cobros
 Por ahora, manuales (transferencia + factura de venta simple). No integrar ninguna pasarela de pagos todavía — eso viene después de validar con los primeros clientes reales.
 
+## Cuenta y sesión
+- **Recuperar contraseña**: flujo estándar de Supabase Auth (correo con enlace de un solo uso → `/auth/confirm` valida el token → `/restablecer-password` define la nueva). Todos los mensajes de error de autenticación se traducen al español en `src/lib/auth-errores.ts` — nunca se le muestra a nadie el texto en inglés que devuelve Supabase.
+- **Aviso de actualizaciones**: pop-up que se muestra una sola vez, en el siguiente inicio de sesión después de agregar una fila a la tabla `actualizaciones` (título + contenido). Cada perfil recuerda cuál fue la última que ya cerró (`perfiles.ultima_actualizacion_vista_id`), así que no se repite. No hay pantalla propia para crearlas todavía — se agregan a mano desde la tabla de Supabase, igual que `festivos`. Hoy la tabla está vacía a propósito, así que no le sale a nadie.
+
 ## Cómo trabajar conmigo
 - Sesiones cortas, un objetivo claro cada vez. Mejor "agrega la tabla de contactos con su formulario de creación" que "construye todo el CRM".
 - Muéstrame qué vas a cambiar antes de tocar archivos.

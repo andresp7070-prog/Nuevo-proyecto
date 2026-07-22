@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { mensajeErrorAuth } from "@/lib/auth-errores";
 
 export async function cambiarPassword(formData: FormData) {
   const supabase = await createClient();
@@ -24,7 +25,7 @@ export async function cambiarPassword(formData: FormData) {
 
   const { error: errorAuth } = await supabase.auth.updateUser({ password });
   if (errorAuth) {
-    redirect(`/cambiar-password?error=${encodeURIComponent(errorAuth.message)}`);
+    redirect(`/cambiar-password?error=${encodeURIComponent(mensajeErrorAuth(errorAuth))}`);
   }
 
   const { error: errorPerfil } = await supabase

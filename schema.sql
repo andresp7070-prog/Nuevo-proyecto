@@ -75,6 +75,20 @@ create table puntos_venta (
 );
 
 -- ------------------------------------------------------------
+-- Actualizaciones de la plataforma — anuncios cortos que se muestran una
+-- sola vez, la siguiente vez que la persona inicia sesión (ver
+-- perfiles.ultima_actualizacion_vista_id más abajo). No hay pantalla propia
+-- para crearlas todavía: se agregan a mano desde la tabla de Supabase,
+-- igual que festivos. Solo la más reciente se le muestra a cada quien.
+-- ------------------------------------------------------------
+create table actualizaciones (
+  id uuid primary key default gen_random_uuid(),
+  titulo text not null,
+  contenido text not null,
+  created_at timestamptz default now()
+);
+
+-- ------------------------------------------------------------
 -- 4. PERFILES — une el login de Supabase (auth.users) con una empresa y un rol
 -- ------------------------------------------------------------
 create table perfiles (
@@ -97,6 +111,9 @@ create table perfiles (
   punto_venta_id uuid references puntos_venta(id),
   nombre text,
   debe_cambiar_password boolean not null default true,  -- true al crear la cuenta; se apaga solo cuando cambia su contraseña por primera vez
+  -- Cuál fue la última actualización (de la tabla actualizaciones) que esta
+  -- persona ya cerró en el pop-up. null = todavía no ha visto ninguna.
+  ultima_actualizacion_vista_id uuid references actualizaciones(id),
   created_at timestamptz default now()
 );
 
@@ -1219,6 +1236,7 @@ group by p.id, p.empresa_id, p.nombre, p.tipo_promocion, p.codigo, p.fecha_inici
 alter table empresas enable row level security;
 alter table puntos_venta enable row level security;
 alter table perfiles enable row level security;
+alter table actualizaciones enable row level security;
 alter table diagnosticos enable row level security;
 alter table suscripciones enable row level security;
 alter table ventas enable row level security;
@@ -1280,6 +1298,11 @@ create policy "ver mi propio perfil" on perfiles
 create policy "actualizar mi propio perfil" on perfiles
   for update using (id = auth.uid() or es_admin())
   with check (id = auth.uid() or es_admin());
+
+-- No es un dato de ninguna empresa en particular (como festivos) — cualquier
+-- persona con sesión puede leerlas, para que el pop-up funcione.
+create policy "ver actualizaciones con sesión activa" on actualizaciones
+  for select using (auth.uid() is not null);
 
 create policy "ver mis diagnosticos" on diagnosticos
   for all using (empresa_id = mi_empresa_id() or es_admin());

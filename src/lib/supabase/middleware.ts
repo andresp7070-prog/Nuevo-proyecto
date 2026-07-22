@@ -28,8 +28,15 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname.startsWith("/login");
+  // Accesibles sin sesión: recuperar contraseña (pide el correo) y el
+  // enlace del correo que la confirma (todavía no hay sesión hasta que se
+  // valide el token ahí adentro).
+  const esRutaPublica =
+    isLoginPage ||
+    request.nextUrl.pathname.startsWith("/recuperar-password") ||
+    request.nextUrl.pathname.startsWith("/auth/confirm");
 
-  if (!user && !isLoginPage) {
+  if (!user && !esRutaPublica) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
