@@ -42,6 +42,12 @@ create table empresas (
   -- negocio que vive de cotizar/negociar antes de vender. Se activa a mano,
   -- igual que modulos_activos y pagina_entrada — nunca lo decide el cliente.
   crm_modo text not null default 'ventas' check (crm_modo in ('ventas','leads')),
+  -- Desarrollo a la medida de un solo cliente (Manantial, tienda de ropa):
+  -- habilita el check "Es un apartado" en Agregar venta y la pantalla
+  -- "Apartados". Se activa a mano, nunca lo decide el cliente — el mismo
+  -- criterio que crm_modo, pero esto ni siquiera es un módulo de precios,
+  -- es una función hecha a la medida (ver la sección de Planes y precios).
+  permite_apartados boolean not null default false,
   fecha_diagnostico date,
   -- Catálogo fijo de métodos de pago (igual para toda la plataforma); cada
   -- empresa activa cuáles acepta. Editable por ahora en la tabla de Supabase.
@@ -510,7 +516,10 @@ begin
   -- Una venta histórica importada (importar_ventas_historicas) no debe volver
   -- a descontar inventario ni recalcular el costo — eso ya pasó de verdad con
   -- el sistema anterior del cliente, y el costo ya viene puesto a mano.
-  if current_setting('app.importando_historico', true) = 'true' then
+  -- Un apartado reclamado (reclamar_apartado) tampoco: la prenda ya se
+  -- descontó cuando se apartó, no cuando se terminó de pagar.
+  if current_setting('app.importando_historico', true) = 'true'
+     or current_setting('app.apartado_ya_descontado', true) = 'true' then
     return new;
   end if;
 
@@ -839,6 +848,298 @@ begin
   end loop;
 
   return v_creados;
+end;
+$$;
+
+-- ------------------------------------------------------------
+-- 8.5. APARTADOS — desarrollo a la medida de Manantial (empresas.permite_apartados)
+-- Venta parcial: el cliente paga un abono, la prenda se separa del
+-- inventario disponible de inmediato, y tiene 30 días para completar el
+-- pago. Si completa, se convierte en una venta real. Si no, lo abonado
+-- queda como ingreso y la prenda vuelve a estar disponible. Las cifras de
+-- venta solo cuentan la plata que de verdad entró en cada momento (mismo
+-- criterio de caja que ya usan los pasivos) — nunca el precio completo por
+-- adelantado, así vista_estado_resultados no necesita ningún cambio: un
+-- apartado no le genera ninguna fila a "ventas" hasta que se resuelve.
+-- ------------------------------------------------------------
+create table apartados (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid references empresas(id) not null,
+  punto_venta_id uuid references puntos_venta(id),
+  contacto_id uuid references crm_contactos(id),
+  cliente_nombre text,
+  cliente_telefono text,
+  cliente_email text,
+  monto_total numeric(12,2) not null,
+  monto_abonado numeric(12,2) not null default 0,
+  fecha date not null default current_date,
+  fecha_limite date not null,
+  estado text not null default 'activo' check (estado in ('activo','reclamado','vencido')),
+  -- Se llena cuando se resuelve (reclamado o vencido) — enlaza a la venta
+  -- real que sí cuenta en el P y G. Null mientras sigue activo.
+  venta_id uuid references ventas(id),
+  created_at timestamptz default now()
+);
+
+create table apartados_items (
+  id uuid primary key default gen_random_uuid(),
+  apartado_id uuid references apartados(id) not null,
+  item_id uuid references inventario_items(id) not null,
+  cantidad numeric(12,2) not null,
+  precio_unitario numeric(12,2) not null,
+  costo_unitario numeric(12,2)  -- congelado al momento de apartar (vía FIFO), igual que ventas_items
+);
+
+create table apartados_abonos (
+  id uuid primary key default gen_random_uuid(),
+  apartado_id uuid references apartados(id) not null,
+  monto numeric(12,2) not null,
+  fecha date not null default current_date,
+  created_at timestamptz default now()
+);
+
+-- Convierte un apartado ya pagado por completo en una venta real. Las
+-- prendas ya se descontaron del inventario cuando se apartaron, así que se
+-- usa la bandera app.apartado_ya_descontado para que el trigger de
+-- descuento automático (pensado para una venta normal) no las reste otra
+-- vez.
+create or replace function reclamar_apartado(p_apartado_id uuid)
+returns uuid
+language plpgsql
+as $$
+declare
+  v_apartado record;
+  v_venta_id uuid;
+  v_item record;
+begin
+  select * into v_apartado from apartados where id = p_apartado_id;
+  if v_apartado.id is null then
+    raise exception 'Apartado no encontrado';
+  end if;
+
+  insert into ventas (empresa_id, punto_venta_id, monto, contacto_id, cliente_nombre, atributos, fecha)
+  values (
+    v_apartado.empresa_id, v_apartado.punto_venta_id, v_apartado.monto_total,
+    v_apartado.contacto_id, v_apartado.cliente_nombre,
+    jsonb_build_object('origen', 'apartado', 'apartado_id', v_apartado.id), now()
+  )
+  returning id into v_venta_id;
+
+  perform set_config('app.apartado_ya_descontado', 'true', true);
+
+  for v_item in
+    select item_id, cantidad, precio_unitario, costo_unitario
+    from apartados_items where apartado_id = p_apartado_id
+  loop
+    insert into ventas_items (venta_id, item_id, cantidad, precio_unitario, costo_unitario)
+    values (v_venta_id, v_item.item_id, v_item.cantidad, v_item.precio_unitario, v_item.costo_unitario);
+  end loop;
+
+  perform set_config('app.apartado_ya_descontado', 'false', true);
+
+  update apartados set estado = 'reclamado', venta_id = v_venta_id where id = p_apartado_id;
+
+  -- Ya hay una venta real de por medio — el contacto pasa a la etapa de
+  -- cierre, exactamente igual que con cualquier otra venta.
+  if v_apartado.contacto_id is not null then
+    update crm_contactos set etapa_id = etapa_cierre_crm(v_apartado.empresa_id) where id = v_apartado.contacto_id;
+  end if;
+
+  return v_venta_id;
+end;
+$$;
+
+-- Registra un abono sobre un apartado activo. Si con este abono se
+-- completa el precio total, el apartado se resuelve solo — no hace falta
+-- un botón aparte para "entregar" la prenda.
+create or replace function agregar_abono_apartado(
+  p_apartado_id uuid,
+  p_monto numeric,
+  p_fecha date default current_date
+)
+returns void
+language plpgsql
+as $$
+declare
+  v_estado text;
+  v_monto_total numeric;
+  v_monto_abonado numeric;
+begin
+  select estado, monto_total into v_estado, v_monto_total from apartados where id = p_apartado_id;
+
+  if v_estado is null then
+    raise exception 'Apartado no encontrado';
+  end if;
+  if v_estado <> 'activo' then
+    raise exception 'Este apartado ya no está activo — no se le pueden agregar más abonos.';
+  end if;
+  if p_monto <= 0 then
+    raise exception 'El abono debe ser mayor a cero.';
+  end if;
+
+  insert into apartados_abonos (apartado_id, monto, fecha) values (p_apartado_id, p_monto, p_fecha);
+
+  update apartados set monto_abonado = monto_abonado + p_monto where id = p_apartado_id;
+
+  select monto_abonado into v_monto_abonado from apartados where id = p_apartado_id;
+
+  if v_monto_abonado >= v_monto_total then
+    perform reclamar_apartado(p_apartado_id);
+  end if;
+end;
+$$;
+
+-- Crea un apartado nuevo: separa la(s) prenda(s) del inventario disponible
+-- de inmediato (FIFO, igual que una venta) y arranca el plazo de 30 días.
+-- El contacto del CRM se busca o se crea igual que en registrar_venta(),
+-- pero sin moverlo a la etapa de cierre todavía — eso solo pasa cuando el
+-- apartado se resuelve de verdad (reclamado o vencido).
+create or replace function registrar_apartado(
+  p_empresa_id uuid,
+  p_contacto_id uuid,
+  p_cliente_nombre text,
+  p_cliente_telefono text,
+  p_cliente_email text,
+  p_items jsonb,  -- [{"item_id":"...","cantidad":1,"precio_unitario":80000}, ...]
+  p_monto_inicial numeric,
+  p_punto_venta_id uuid default null
+)
+returns uuid
+language plpgsql
+as $$
+declare
+  v_contacto_id uuid;
+  v_apartado_id uuid;
+  v_monto_total numeric(12,2);
+  v_item jsonb;
+  v_item_id uuid;
+  v_cantidad numeric;
+  v_precio numeric;
+  v_costo numeric;
+  v_stock numeric;
+  v_nombre text;
+  v_es_insumo boolean;
+  v_tipo text;
+begin
+  if p_contacto_id is not null then
+    v_contacto_id := p_contacto_id;
+    update crm_contactos
+    set nombre = coalesce(p_cliente_nombre, nombre), email = coalesce(p_cliente_email, email)
+    where id = v_contacto_id;
+  elsif coalesce(p_cliente_nombre, '') <> '' then
+    select id into v_contacto_id
+    from crm_contactos where empresa_id = p_empresa_id and telefono = p_cliente_telefono
+    limit 1;
+
+    if v_contacto_id is null then
+      insert into crm_contactos (empresa_id, nombre, telefono, email)
+      values (p_empresa_id, p_cliente_nombre, p_cliente_telefono, p_cliente_email)
+      returning id into v_contacto_id;
+    else
+      update crm_contactos
+      set nombre = coalesce(p_cliente_nombre, nombre), email = coalesce(p_cliente_email, email)
+      where id = v_contacto_id;
+    end if;
+  else
+    v_contacto_id := null;
+  end if;
+
+  select sum((item->>'cantidad')::numeric * (item->>'precio_unitario')::numeric)
+  into v_monto_total
+  from jsonb_array_elements(p_items) as item;
+
+  insert into apartados (empresa_id, punto_venta_id, contacto_id, cliente_nombre, cliente_telefono, cliente_email, monto_total, fecha, fecha_limite)
+  values (p_empresa_id, p_punto_venta_id, v_contacto_id, p_cliente_nombre, p_cliente_telefono, p_cliente_email, v_monto_total, current_date, current_date + interval '30 days')
+  returning id into v_apartado_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_item_id := (v_item->>'item_id')::uuid;
+    v_cantidad := (v_item->>'cantidad')::numeric;
+    v_precio := (v_item->>'precio_unitario')::numeric;
+
+    select tipo, cantidad, nombre, es_insumo into v_tipo, v_stock, v_nombre, v_es_insumo
+    from inventario_items where id = v_item_id;
+
+    if v_es_insumo then
+      raise exception '"%" es material de receta y no se vende individualmente.', v_nombre;
+    end if;
+    if v_stock < v_cantidad then
+      raise exception 'No hay suficiente stock de "%": quedan % y se intentó apartar %.', v_nombre, v_stock, v_cantidad;
+    end if;
+
+    v_costo := consumir_lotes_fifo(v_item_id, v_cantidad);
+
+    insert into inventario_movimientos (item_id, tipo, cantidad, nota)
+    values (v_item_id, 'salida', v_cantidad, 'Apartado — separado del inventario disponible');
+
+    update inventario_items set cantidad = cantidad - v_cantidad where id = v_item_id;
+
+    insert into apartados_items (apartado_id, item_id, cantidad, precio_unitario, costo_unitario)
+    values (v_apartado_id, v_item_id, v_cantidad, v_precio, v_costo);
+  end loop;
+
+  if p_monto_inicial > 0 then
+    perform agregar_abono_apartado(v_apartado_id, p_monto_inicial, current_date);
+  end if;
+
+  return v_apartado_id;
+end;
+$$;
+
+-- Revisa los apartados vencidos de una empresa (más de 30 días sin
+-- completar el pago) y los resuelve: lo abonado hasta ese momento queda
+-- como ingreso (el cliente lo pierde), y la prenda vuelve a estar
+-- disponible en el inventario. No corre sola en segundo plano (no hay
+-- servidor propio para eso) — se llama cada vez que alguien abre la
+-- pantalla de Apartados, así que el cierre ocurre en la próxima visita a
+-- esa pantalla, no exactamente al minuto del vencimiento.
+create or replace function aplicar_vencimiento_apartados(p_empresa_id uuid)
+returns void
+language plpgsql
+as $$
+declare
+  v_apartado record;
+  v_venta_id uuid;
+  v_item record;
+begin
+  for v_apartado in
+    select * from apartados
+    where empresa_id = p_empresa_id and estado = 'activo' and fecha_limite < current_date
+  loop
+    if v_apartado.monto_abonado > 0 then
+      insert into ventas (empresa_id, punto_venta_id, monto, contacto_id, cliente_nombre, fecha, atributos)
+      values (
+        v_apartado.empresa_id, v_apartado.punto_venta_id, v_apartado.monto_abonado,
+        v_apartado.contacto_id, v_apartado.cliente_nombre, v_apartado.fecha_limite,
+        jsonb_build_object('origen', 'apartado_vencido', 'apartado_id', v_apartado.id)
+      )
+      returning id into v_venta_id;
+
+      insert into ventas_items (venta_id, nombre_libre, cantidad, precio_unitario, costo_unitario)
+      values (v_venta_id, 'Apartado vencido — abono no reclamado', 1, v_apartado.monto_abonado, 0);
+
+      if v_apartado.contacto_id is not null then
+        update crm_contactos set etapa_id = etapa_cierre_crm(v_apartado.empresa_id) where id = v_apartado.contacto_id;
+      end if;
+    else
+      v_venta_id := null;
+    end if;
+
+    for v_item in
+      select item_id, cantidad, costo_unitario from apartados_items where apartado_id = v_apartado.id
+    loop
+      insert into inventario_lotes (item_id, cantidad_disponible, costo_unitario)
+      values (v_item.item_id, v_item.cantidad, coalesce(v_item.costo_unitario, 0));
+
+      insert into inventario_movimientos (item_id, tipo, motivo, cantidad, nota)
+      values (v_item.item_id, 'entrada', 'devolucion', v_item.cantidad, 'Apartado vencido — vuelve a estar disponible');
+
+      update inventario_items set cantidad = cantidad + v_item.cantidad where id = v_item.item_id;
+    end loop;
+
+    update apartados set estado = 'vencido', venta_id = v_venta_id where id = v_apartado.id;
+  end loop;
 end;
 $$;
 
@@ -1253,6 +1554,9 @@ alter table finanzas_movimientos enable row level security;
 alter table pasivos enable row level security;
 alter table promociones enable row level security;
 alter table promocion_items enable row level security;
+alter table apartados enable row level security;
+alter table apartados_items enable row level security;
+alter table apartados_abonos enable row level security;
 
 -- Funciones auxiliares, para no repetir la misma subconsulta en cada política.
 -- security definer es necesario aquí: la política de "perfiles" usa es_admin(),
@@ -1348,6 +1652,25 @@ create policy "ver mis pasivos" on pasivos
 
 create policy "ver mis promociones" on promociones
   for all using (empresa_id = mi_empresa_id() or es_admin());
+
+create policy "ver mis apartados" on apartados
+  for all using (
+    (empresa_id = mi_empresa_id()
+      and (mi_punto_venta_id() is null or punto_venta_id = mi_punto_venta_id()))
+    or es_admin()
+  );
+
+create policy "ver items de mis apartados" on apartados_items
+  for all using (
+    apartado_id in (select id from apartados where empresa_id = mi_empresa_id())
+    or es_admin()
+  );
+
+create policy "ver abonos de mis apartados" on apartados_abonos
+  for all using (
+    apartado_id in (select id from apartados where empresa_id = mi_empresa_id())
+    or es_admin()
+  );
 
 -- Tablas sin empresa_id directo: se filtran a través de su tabla padre
 create policy "ver interacciones de mi crm" on crm_interacciones

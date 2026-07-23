@@ -33,12 +33,15 @@ export default async function NuevaVentaPage() {
 
   const { data: empresa } = await supabase
     .from("empresas")
-    .select("metodos_pago_disponibles, modulos_activos")
+    .select("metodos_pago_disponibles, modulos_activos, permite_apartados")
     .eq("id", perfil.empresa_id)
     .single();
 
   const crmActivo = (empresa?.modulos_activos ?? []).includes("crm");
   const inventarioActivo = (empresa?.modulos_activos ?? []).includes("inventario");
+  // Un apartado siempre parte de un producto real del catálogo (item_id) —
+  // sin Inventario activo no hay catálogo, así que no tiene dónde apoyarse.
+  const permiteApartados = Boolean(empresa?.permite_apartados) && inventarioActivo;
 
   // Sin el módulo de Inventario, la empresa no tiene catálogo — la persona
   // escribe libremente qué vendió, y solo le ayudamos con lo que ya haya
@@ -138,6 +141,7 @@ export default async function NuevaVentaPage() {
       promociones={promociones}
       crmActivo={crmActivo}
       puntoVentaId={puntoSeleccionado}
+      permiteApartados={permiteApartados}
     />
   );
 }

@@ -7,7 +7,13 @@ import { ahoraFecha, ahoraHora } from "@/lib/fecha";
 import { sinTildes } from "@/lib/texto";
 import { etiquetaUnidad } from "@/lib/unidades";
 import { EntradaMoneda } from "@/components/campo-moneda";
-import { buscarClientes, guardarVenta, deshacerVenta, type ClienteEncontrado } from "./actions";
+import {
+  buscarClientes,
+  guardarVenta,
+  deshacerVenta,
+  registrarApartado,
+  type ClienteEncontrado,
+} from "./actions";
 
 const SEGUNDOS_PARA_DESHACER = 60;
 
@@ -127,6 +133,7 @@ export function NuevaVentaForm({
   promociones,
   crmActivo,
   puntoVentaId = null,
+  permiteApartados = false,
 }: {
   items: ItemCatalogo[];
   sugerenciasProductos: string[];
@@ -135,11 +142,14 @@ export function NuevaVentaForm({
   promociones: Promocion[];
   crmActivo: boolean;
   puntoVentaId?: string | null;
+  permiteApartados?: boolean;
 }) {
   const router = useRouter();
 
   const [orden, setOrden] = useState<"cliente-primero" | "productos-primero">("cliente-primero");
   const [metodoPago, setMetodoPago] = useState(metodosPago[0] ?? "");
+  const [esApartado, setEsApartado] = useState(false);
+  const [abonoInicial, setAbonoInicial] = useState("");
 
   const [fecha, setFecha] = useState(ahoraFecha());
   const [hora, setHora] = useState(ahoraHora());
@@ -369,12 +379,51 @@ export function NuevaVentaForm({
         return;
       }
     }
-    if (!metodoPago) {
+    if (esApartado) {
+      const abonoNum = Number(abonoInicial) || 0;
+      if (!abonoInicial.trim() || abonoNum <= 0) {
+        setError("El abono inicial es obligatorio y debe ser mayor a cero.");
+        return;
+      }
+      if (abonoNum > total) {
+        setError("El abono inicial no puede ser mayor al precio total.");
+        return;
+      }
+    } else if (!metodoPago) {
       setError("Selecciona un método de pago.");
       return;
     }
 
     setGuardando(true);
+
+    if (esApartado) {
+      try {
+        const resultado = await registrarApartado({
+          contactoId,
+          clienteNombre: nombre.trim(),
+          clienteTelefono: telefono.trim(),
+          clienteEmail: email.trim(),
+          montoInicial: Number(abonoInicial) || 0,
+          puntoVentaId,
+          items: lineasValidas.map((linea) => ({
+            itemId: linea.itemId,
+            cantidad: linea.cantidad,
+            precioUnitario: linea.precioUnitario,
+          })),
+        });
+        if (resultado.error || !resultado.apartadoId) {
+          setError(resultado.error ?? "No se pudo registrar el apartado.");
+          setGuardando(false);
+          return;
+        }
+        router.push(`/apartados/${resultado.apartadoId}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo registrar el apartado.");
+        setGuardando(false);
+      }
+      return;
+    }
+
     try {
       const fechaHora = new Date(`${fecha}T${hora}:00`).toISOString();
       const resultado = await guardarVenta({
@@ -602,7 +651,8 @@ export function NuevaVentaForm({
             );
           }
 
-          const aplicables = inventarioActivo ? promocionesAplicables(linea.itemId) : [];
+          const aplicables =
+            inventarioActivo && !esApartado ? promocionesAplicables(linea.itemId) : [];
           const promoSeleccionada = aplicables.find((p) => p.id === linea.promocionId) ?? null;
 
           if (!inventarioActivo) {
@@ -904,28 +954,46 @@ export function NuevaVentaForm({
         + Agregar producto
       </button>
 
-      <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">
-            Método de pago *
-          </label>
-          <select
-            value={metodoPago}
-            onChange={(e) => setMetodoPago(e.target.value)}
-            className="rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
-          >
-            {metodosPago.length === 0 && <option value="">Sin métodos configurados</option>}
-            {metodosPago.map((valor) => (
-              <option key={valor} value={valor}>
-                {etiquetaMetodoPago[valor] ?? valor}
-              </option>
-            ))}
-          </select>
+      {esApartado ? (
+        <div className="mt-4 flex items-end justify-between gap-4 border-t border-gray-200 pt-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">
+              Abono inicial *
+            </label>
+            <EntradaMoneda
+              value={abonoInicial}
+              onChange={setAbonoInicial}
+              className="w-40 rounded-lg border border-gray-300 py-2 pl-6 pr-2 text-sm focus:border-gray-500 focus:outline-none"
+            />
+          </div>
+          <p className="text-sm font-semibold text-gray-900">
+            Precio total: {total.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+          </p>
         </div>
-        <p className="text-sm font-semibold text-gray-900">
-          Total: {total.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
-        </p>
-      </div>
+      ) : (
+        <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">
+              Método de pago *
+            </label>
+            <select
+              value={metodoPago}
+              onChange={(e) => setMetodoPago(e.target.value)}
+              className="rounded-lg border border-gray-300 px-2 py-2 text-sm focus:border-gray-500 focus:outline-none"
+            >
+              {metodosPago.length === 0 && <option value="">Sin métodos configurados</option>}
+              {metodosPago.map((valor) => (
+                <option key={valor} value={valor}>
+                  {etiquetaMetodoPago[valor] ?? valor}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-sm font-semibold text-gray-900">
+            Total: {total.toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+          </p>
+        </div>
+      )}
     </section>
   );
 
@@ -990,6 +1058,22 @@ export function NuevaVentaForm({
           />
         </div>
       </div>
+
+      {permiteApartados && (
+        <label className="mb-6 flex items-start gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={esApartado}
+            onChange={(e) => setEsApartado(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            Es un apartado — el cliente paga una parte hoy y el resto después. La prenda se
+            separa del inventario de inmediato y tiene 30 días para reclamarla; si no, el
+            abono queda como ingreso y la prenda vuelve a estar disponible.
+          </span>
+        </label>
+      )}
 
       <div className="space-y-6">{secciones}</div>
 

@@ -115,6 +115,16 @@ Para cuando una empresa nueva viene de otra herramienta (Siigo, Alegra, una hoja
 - **Los clientes importados** (`importar_clientes()`) usan `on conflict do nothing` sobre `(empresa_id, telefono)` — si el archivo se sube dos veces por error, no crea duplicados.
 - Cuando se construya la pantalla de importación, siempre debe mostrar una vista previa de lo que se va a importar antes de confirmar — nunca una carga a ciegas.
 
+### Apartados — desarrollo a la medida de Manantial, no un módulo del producto
+
+Manantial (tienda de ropa) vende con "apartados": el cliente abona una parte, la prenda se separa del inventario de inmediato, y tiene 30 días para completar el pago. Si no completa, el abono queda como ingreso (el cliente lo pierde) y la prenda vuelve a estar disponible. Esto es desarrollo específico para un cliente (ver "Planes y precios" — se cobra aparte de la suscripción), no un módulo general: se activa a mano con `empresas.permite_apartados`, igual criterio que `crm_modo` — ninguna otra empresa ve el check "Es un apartado" en Agregar venta ni la pantalla "Apartados".
+
+- **Las cifras de venta solo cuentan la plata que de verdad entró**, nunca el precio completo por adelantado — mismo criterio de caja que ya usan los pasivos. Un apartado no le genera ninguna fila a `ventas` hasta que se resuelve (reclamado o vencido); mientras está activo, vive aparte en `apartados`/`apartados_items`/`apartados_abonos` y no aparece en ningún reporte de ventas ni en el P y G.
+- Al apartar, la prenda se descuenta del inventario disponible de inmediato (FIFO, igual que una venta) — así nadie más la puede comprar mientras el cliente termina de pagar.
+- Cada abono se registra con `agregar_abono_apartado()`. Si con ese abono se completa el precio total, el apartado se resuelve solo — no hace falta un botón aparte para "entregar" la prenda: se convierte en una venta real (`reclamar_apartado()`) y el contacto del CRM pasa a la etapa de cierre, igual que cualquier otra venta.
+- El vencimiento (30 días corridos desde que se apartó, no mes calendario) tampoco corre en segundo plano — se revisa cada vez que alguien abre la pantalla de Apartados (`aplicar_vencimiento_apartados()`), mismo patrón que las reglas de inactividad del CRM.
+- Si vence sin completar: lo abonado se registra como una venta por ese monto (fecha = la del vencimiento), la prenda vuelve al inventario disponible, y el contacto también pasa a etapa de cierre (si pagó algo, sigue siendo un cliente real).
+
 ## Los módulos del producto, y su estado
 | Módulo | Estado |
 |---|---|
