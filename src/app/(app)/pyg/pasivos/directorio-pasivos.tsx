@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ahoraFecha } from "@/lib/fecha";
-import { registrarAbono, marcarPagado } from "./actions";
+import { CampoMoneda } from "@/components/campo-moneda";
+import { registrarAbono, marcarPagado, actualizarPasivo } from "./actions";
 
 type Pasivo = {
   id: string;
@@ -33,6 +34,21 @@ const etiquetaFrecuencia: Record<string, string> = {
   unico: "Pago único",
 };
 
+const tiposPasivo = [
+  { value: "prestamo", label: "Préstamo" },
+  { value: "proveedor", label: "Proveedor" },
+  { value: "tarjeta_credito", label: "Tarjeta de crédito" },
+  { value: "otro", label: "Otro" },
+];
+
+const frecuenciasPasivo = [
+  { value: "", label: "Sin definir" },
+  { value: "diario", label: "Diario" },
+  { value: "mensual", label: "Mensual" },
+  { value: "anual", label: "Anual" },
+  { value: "unico", label: "Pago único" },
+];
+
 function formatoMoneda(valor: number) {
   return valor.toLocaleString("es-CO", { style: "currency", currency: "COP" });
 }
@@ -50,6 +66,13 @@ function FilaPasivo({ pasivo, pagos }: { pasivo: Pasivo; pagos: Pago[] }) {
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [editando, setEditando] = useState(false);
+  const [descripcion, setDescripcion] = useState(pasivo.descripcion);
+  const [tipo, setTipo] = useState(pasivo.tipo ?? "otro");
+  const [montoTotal, setMontoTotal] = useState(String(pasivo.monto_total));
+  const [fechaVencimiento, setFechaVencimiento] = useState(pasivo.fecha_vencimiento ?? "");
+  const [frecuenciaPago, setFrecuenciaPago] = useState(pasivo.frecuencia_pago ?? "");
 
   const saldo = pasivo.monto_total - pasivo.monto_pagado;
 
@@ -82,6 +105,132 @@ function FilaPasivo({ pasivo, pagos }: { pasivo: Pasivo; pagos: Pago[] }) {
     router.refresh();
   }
 
+  function cancelarEdicion() {
+    setEditando(false);
+    setError(null);
+    setDescripcion(pasivo.descripcion);
+    setTipo(pasivo.tipo ?? "otro");
+    setMontoTotal(String(pasivo.monto_total));
+    setFechaVencimiento(pasivo.fecha_vencimiento ?? "");
+    setFrecuenciaPago(pasivo.frecuencia_pago ?? "");
+  }
+
+  async function guardarEdicion() {
+    setError(null);
+    if (!descripcion.trim()) {
+      setError("La descripción es obligatoria.");
+      return;
+    }
+    const montoNum = Number(montoTotal);
+    if (montoTotal.trim() === "" || Number.isNaN(montoNum) || montoNum <= 0) {
+      setError("El monto total es obligatorio y debe ser mayor a cero.");
+      return;
+    }
+    setProcesando(true);
+    const resultado = await actualizarPasivo({
+      pasivoId: pasivo.id,
+      descripcion: descripcion.trim(),
+      tipo,
+      montoTotal: montoNum,
+      fechaVencimiento,
+      frecuenciaPago,
+    });
+    setProcesando(false);
+    if (resultado.error) {
+      setError(resultado.error);
+      return;
+    }
+    setEditando(false);
+    router.refresh();
+  }
+
+  if (editando) {
+    return (
+      <li className="py-3">
+        <div className="space-y-3 rounded-lg bg-gray-50 p-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Descripción</label>
+            <input
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Tipo</label>
+              <select
+                value={tipo}
+                onChange={(e) => setTipo(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
+              >
+                {tiposPasivo.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <CampoMoneda
+              id={`monto-${pasivo.id}`}
+              label="Monto total"
+              value={montoTotal}
+              onChange={setMontoTotal}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                Fecha de vencimiento
+              </label>
+              <input
+                type="date"
+                value={fechaVencimiento}
+                onChange={(e) => setFechaVencimiento(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                Cada cuánto se paga
+              </label>
+              <select
+                value={frecuenciaPago}
+                onChange={(e) => setFrecuenciaPago(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
+              >
+                {frecuenciasPasivo.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={guardarEdicion}
+              disabled={procesando}
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+            >
+              {procesando ? "Guardando..." : "Guardar cambios"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelarEdicion}
+              disabled={procesando}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </li>
+    );
+  }
+
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -97,19 +246,28 @@ function FilaPasivo({ pasivo, pagos }: { pasivo: Pasivo; pagos: Pago[] }) {
               .join(" · ")}
           </p>
         </div>
-        <div className="text-right">
-          {pasivo.estado === "pagado" ? (
-            <p className="text-sm font-medium text-green-700">Pagado</p>
-          ) : (
-            <>
-              <p className={`text-sm font-medium ${estaVencido(pasivo) ? "text-red-600" : "text-gray-900"}`}>
-                {formatoMoneda(saldo)} pendiente{estaVencido(pasivo) ? " · vencido" : ""}
-              </p>
-              <p className="text-xs text-gray-400">
-                {formatoMoneda(pasivo.monto_pagado)} de {formatoMoneda(pasivo.monto_total)} pagado
-              </p>
-            </>
-          )}
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            {pasivo.estado === "pagado" ? (
+              <p className="text-sm font-medium text-green-700">Pagado</p>
+            ) : (
+              <>
+                <p className={`text-sm font-medium ${estaVencido(pasivo) ? "text-red-600" : "text-gray-900"}`}>
+                  {formatoMoneda(saldo)} pendiente{estaVencido(pasivo) ? " · vencido" : ""}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {formatoMoneda(pasivo.monto_pagado)} de {formatoMoneda(pasivo.monto_total)} pagado
+                </p>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            className="text-xs text-gray-400 hover:text-gray-700"
+          >
+            Editar
+          </button>
         </div>
       </div>
 

@@ -38,6 +38,54 @@ export async function crearPasivo(input: {
   return { error: null };
 }
 
+export async function actualizarPasivo(input: {
+  pasivoId: string;
+  descripcion: string;
+  tipo: string;
+  montoTotal: number;
+  fechaVencimiento: string;
+  frecuenciaPago: string;
+}): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No hay sesión activa." };
+
+  const { data: pasivo, error: errorLectura } = await supabase
+    .from("pasivos")
+    .select("monto_pagado")
+    .eq("id", input.pasivoId)
+    .single();
+
+  if (errorLectura || !pasivo) {
+    return { error: errorLectura?.message ?? "No se encontró la deuda." };
+  }
+
+  if (input.montoTotal < pasivo.monto_pagado) {
+    return {
+      error: `El monto total no puede quedar por debajo de lo que ya se ha pagado (${pasivo.monto_pagado.toLocaleString("es-CO", { style: "currency", currency: "COP" })}).`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("pasivos")
+    .update({
+      descripcion: input.descripcion,
+      tipo: input.tipo || null,
+      monto_total: input.montoTotal,
+      fecha_vencimiento: input.fechaVencimiento || null,
+      frecuencia_pago: input.frecuenciaPago || null,
+      // Si el monto total baja hasta igualar lo ya pagado, queda pagada sola;
+      // si sube por encima de lo pagado, vuelve a quedar pendiente.
+      estado: pasivo.monto_pagado >= input.montoTotal ? "pagado" : "pendiente",
+    })
+    .eq("id", input.pasivoId);
+
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
 export async function registrarAbono(input: {
   pasivoId: string;
   monto: number;

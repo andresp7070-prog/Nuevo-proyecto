@@ -209,10 +209,10 @@ export default async function PygPage({
         <h1 className="text-lg font-semibold text-gray-900">Estado de pérdidas y ganancias</h1>
         <div className="flex gap-2">
           <Link
-            href="/pyg/movimientos/nuevo"
+            href="/pyg/movimientos"
             className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
           >
-            Agregar gasto o ingreso
+            Gastos e ingresos
           </Link>
           <Link
             href="/pyg/pasivos"

@@ -41,3 +41,40 @@ export async function crearMovimiento(input: {
   if (error) return { error: error.message };
   return { error: null };
 }
+
+export async function actualizarMovimiento(input: {
+  movimientoId: string;
+  tipo: "ingreso" | "gasto";
+  categoria: string;
+  monto: number;
+  fecha: string;
+  nota: string;
+  recurrente: boolean;
+  frecuencia: string;
+}): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No hay sesión activa." };
+
+  const { error } = await supabase
+    .from("finanzas_movimientos")
+    // pasivo_id is null protege los movimientos generados automáticamente
+    // por un abono de deuda — esos se corrigen desde Deudas, no desde acá,
+    // para que no se desincronicen del monto_pagado de esa deuda.
+    .update({
+      tipo: input.tipo,
+      categoria: input.categoria || null,
+      monto: input.monto,
+      fecha: input.fecha,
+      nota: input.nota || null,
+      recurrente: input.recurrente,
+      frecuencia: input.frecuencia || null,
+    })
+    .eq("id", input.movimientoId)
+    .is("pasivo_id", null);
+
+  if (error) return { error: error.message };
+  return { error: null };
+}
