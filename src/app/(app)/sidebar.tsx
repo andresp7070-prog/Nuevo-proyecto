@@ -60,7 +60,6 @@ export function Sidebar({
   puntoSeleccionado = null,
   mostrarSelectorPunto = false,
   puntoFijoNombre = null,
-  permiteApartados = false,
 }: {
   modulosActivos: string[];
   rolEmpresa: "administrador" | "vendedor";
@@ -69,7 +68,6 @@ export function Sidebar({
   puntoSeleccionado?: string | null;
   mostrarSelectorPunto?: boolean;
   puntoFijoNombre?: string | null;
-  permiteApartados?: boolean;
 }) {
   const pathname = usePathname();
   const esVendedor = rolEmpresa === "vendedor";
@@ -151,20 +149,6 @@ export function Sidebar({
               </li>
             );
           })}
-          {permiteApartados && (
-            <li>
-              <Link
-                href="/apartados"
-                className={`block rounded-lg px-3 py-2 text-sm font-medium ${
-                  pathname === "/apartados" || pathname.startsWith("/apartados/")
-                    ? "bg-accent text-white"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Apartados
-              </Link>
-            </li>
-          )}
         </ul>
 
         {bloqueados.length > 0 && (

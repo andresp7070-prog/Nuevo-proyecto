@@ -34,7 +34,7 @@ export default async function ProyeccionesVentasPage() {
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("empresa_id, punto_venta_id")
+    .select("empresa_id, punto_venta_id, empresas ( permite_apartados )")
     .eq("id", user.id)
     .single();
 
@@ -45,6 +45,10 @@ export default async function ProyeccionesVentasPage() {
       </p>
     );
   }
+
+  // La relación empresa_id -> empresas.id es uno-a-uno; Supabase la tipa como
+  // arreglo por falta de tipos generados, pero en tiempo de ejecución es un objeto.
+  const empresa = perfil.empresas as unknown as { permite_apartados: boolean } | null;
 
   const { puntoSeleccionado } = await obtenerContextoPunto(
     supabase,
@@ -87,7 +91,7 @@ export default async function ProyeccionesVentasPage() {
 
   return (
     <div>
-      <VentasTabs />
+      <VentasTabs permiteApartados={Boolean(empresa?.permite_apartados)} />
 
       <div className="mb-6">
         <h1 className="text-lg font-semibold text-gray-900">Proyecciones</h1>

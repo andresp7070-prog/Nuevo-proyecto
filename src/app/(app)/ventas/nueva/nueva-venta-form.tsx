@@ -418,7 +418,7 @@ export function NuevaVentaForm({
           setGuardando(false);
           return;
         }
-        router.push(`/apartados/${resultado.apartadoId}`);
+        router.push(`/ventas/apartados/${resultado.apartadoId}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo registrar el apartado.");
         setGuardando(false);

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { VentasTabs } from "../ventas-tabs";
 
 export default async function ApartadosPage() {
   const supabase = await createClient();
@@ -67,6 +68,8 @@ export default async function ApartadosPage() {
 
   return (
     <div>
+      <VentasTabs permiteApartados />
+
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Apartados</h1>
         <Link
@@ -86,7 +89,7 @@ export default async function ApartadosPage() {
             return (
               <li key={apartado.id}>
                 <Link
-                  href={`/apartados/${apartado.id}`}
+                  href={`/ventas/apartados/${apartado.id}`}
                   className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
                 >
                   <div>

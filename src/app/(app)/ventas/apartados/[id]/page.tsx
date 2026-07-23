@@ -56,7 +56,7 @@ export default async function ApartadoPage({
 
   return (
     <div className="max-w-2xl space-y-6">
-      <Link href="/apartados" className="text-sm text-gray-500 hover:text-gray-700">
+      <Link href="/ventas/apartados" className="text-sm text-gray-500 hover:text-gray-700">
         ← Volver a Apartados
       </Link>
 

@@ -44,7 +44,7 @@ export default async function VentasPage({
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("empresa_id, punto_venta_id")
+    .select("empresa_id, punto_venta_id, empresas ( permite_apartados )")
     .eq("id", user.id)
     .single();
 
@@ -61,6 +61,11 @@ export default async function VentasPage({
     perfil.empresa_id,
     perfil.punto_venta_id,
   );
+
+  // La relación empresa_id -> empresas.id es uno-a-uno; Supabase la tipa como
+  // arreglo por falta de tipos generados, pero en tiempo de ejecución es un objeto.
+  const empresa = perfil.empresas as unknown as { permite_apartados: boolean } | null;
+  const permiteApartados = Boolean(empresa?.permite_apartados);
 
   let query = supabase
     .from("ventas")
@@ -116,7 +121,7 @@ export default async function VentasPage({
 
   return (
     <div>
-      <VentasTabs />
+      <VentasTabs permiteApartados={permiteApartados} />
 
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">Ventas</h1>

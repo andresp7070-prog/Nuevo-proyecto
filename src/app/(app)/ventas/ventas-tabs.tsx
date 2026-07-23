@@ -9,12 +9,17 @@ const PESTANAS = [
   { href: "/ventas/importar", etiqueta: "Importar" },
 ];
 
-export function VentasTabs() {
+// "Apartados" es desarrollo a la medida de un solo cliente (Manantial) —
+// nunca aparece salvo que la empresa tenga empresas.permite_apartados.
+const PESTANA_APARTADOS = { href: "/ventas/apartados", etiqueta: "Apartados" };
+
+export function VentasTabs({ permiteApartados = false }: { permiteApartados?: boolean }) {
   const pathname = usePathname();
+  const pestanas = permiteApartados ? [...PESTANAS, PESTANA_APARTADOS] : PESTANAS;
 
   return (
     <div className="mb-6 flex gap-4 border-b border-gray-200">
-      {PESTANAS.map((pestana) => {
+      {pestanas.map((pestana) => {
         const activa =
           pestana.href === "/ventas" ? pathname === "/ventas" : pathname.startsWith(pestana.href);
         return (

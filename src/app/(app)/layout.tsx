@@ -71,7 +71,6 @@ export default async function AppLayout({
             ? (puntosVenta.find((p) => p.id === perfil.punto_venta_id)?.nombre ?? null)
             : null
         }
-        permiteApartados={perfil.empresas?.permite_apartados ?? false}
       />
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
