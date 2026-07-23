@@ -881,13 +881,19 @@ create table apartados (
   created_at timestamptz default now()
 );
 
+-- item_id es opcional: si la empresa tiene catálogo (Inventario activo), la
+-- prenda se separa de ahí (FIFO) igual que una venta normal. Si no (ej.
+-- Manantial, que no tiene el módulo de Inventario), queda null y se usa
+-- nombre_libre + costo_unitario escrito a mano — el mismo patrón dual que ya
+-- usa ventas_items, y sin catálogo no hay nada que descontar ni devolver.
 create table apartados_items (
   id uuid primary key default gen_random_uuid(),
   apartado_id uuid references apartados(id) not null,
-  item_id uuid references inventario_items(id) not null,
+  item_id uuid references inventario_items(id),
+  nombre_libre text,
   cantidad numeric(12,2) not null,
   precio_unitario numeric(12,2) not null,
-  costo_unitario numeric(12,2)  -- congelado al momento de apartar (vía FIFO), igual que ventas_items
+  costo_unitario numeric(12,2)  -- congelado vía FIFO si hay item_id; escrito a mano si no
 );
 
 create table apartados_abonos (
@@ -899,10 +905,12 @@ create table apartados_abonos (
 );
 
 -- Convierte un apartado ya pagado por completo en una venta real. Las
--- prendas ya se descontaron del inventario cuando se apartaron, así que se
--- usa la bandera app.apartado_ya_descontado para que el trigger de
--- descuento automático (pensado para una venta normal) no las reste otra
--- vez.
+-- prendas con item_id ya se descontaron del inventario cuando se
+-- apartaron, así que se usa la bandera app.apartado_ya_descontado para que
+-- el trigger de descuento automático (pensado para una venta normal) no
+-- las reste otra vez. Las líneas con nombre_libre (sin catálogo) nunca
+-- tocan inventario, ni al apartar ni al reclamar — igual que una venta
+-- normal sin catálogo.
 create or replace function reclamar_apartado(p_apartado_id uuid)
 returns uuid
 language plpgsql
@@ -928,11 +936,11 @@ begin
   perform set_config('app.apartado_ya_descontado', 'true', true);
 
   for v_item in
-    select item_id, cantidad, precio_unitario, costo_unitario
+    select item_id, nombre_libre, cantidad, precio_unitario, costo_unitario
     from apartados_items where apartado_id = p_apartado_id
   loop
-    insert into ventas_items (venta_id, item_id, cantidad, precio_unitario, costo_unitario)
-    values (v_venta_id, v_item.item_id, v_item.cantidad, v_item.precio_unitario, v_item.costo_unitario);
+    insert into ventas_items (venta_id, item_id, nombre_libre, cantidad, precio_unitario, costo_unitario)
+    values (v_venta_id, v_item.item_id, v_item.nombre_libre, v_item.cantidad, v_item.precio_unitario, v_item.costo_unitario);
   end loop;
 
   perform set_config('app.apartado_ya_descontado', 'false', true);
@@ -989,18 +997,22 @@ begin
 end;
 $$;
 
--- Crea un apartado nuevo: separa la(s) prenda(s) del inventario disponible
--- de inmediato (FIFO, igual que una venta) y arranca el plazo de 30 días.
--- El contacto del CRM se busca o se crea igual que en registrar_venta(),
--- pero sin moverlo a la etapa de cierre todavía — eso solo pasa cuando el
--- apartado se resuelve de verdad (reclamado o vencido).
+-- Crea un apartado nuevo y arranca el plazo de 30 días. Cada línea puede
+-- venir con item_id (empresa con catálogo: la prenda se separa del
+-- inventario disponible de inmediato, FIFO, igual que una venta) o con
+-- nombre_libre + costo escrito a mano (empresa sin catálogo, ej. Manantial —
+-- no hay nada que descontar ni devolver, exactamente igual que una venta
+-- normal sin Inventario). El contacto del CRM se busca o se crea igual que
+-- en registrar_venta(), pero sin moverlo a la etapa de cierre todavía — eso
+-- solo pasa cuando el apartado se resuelve de verdad (reclamado o vencido).
 create or replace function registrar_apartado(
   p_empresa_id uuid,
   p_contacto_id uuid,
   p_cliente_nombre text,
   p_cliente_telefono text,
   p_cliente_email text,
-  p_items jsonb,  -- [{"item_id":"...","cantidad":1,"precio_unitario":80000}, ...]
+  p_items jsonb,  -- [{"item_id":"...","nombre_libre":null,"cantidad":1,"precio_unitario":80000,"costo_unitario":null}, ...]
+                   -- o, sin catálogo: [{"item_id":null,"nombre_libre":"Vestido azul","cantidad":1,"precio_unitario":80000,"costo_unitario":40000}, ...]
   p_monto_inicial numeric,
   p_punto_venta_id uuid default null
 )
@@ -1054,29 +1066,37 @@ begin
 
   for v_item in select * from jsonb_array_elements(p_items)
   loop
-    v_item_id := (v_item->>'item_id')::uuid;
+    v_item_id := nullif(v_item->>'item_id', '')::uuid;
     v_cantidad := (v_item->>'cantidad')::numeric;
     v_precio := (v_item->>'precio_unitario')::numeric;
 
-    select tipo, cantidad, nombre, es_insumo into v_tipo, v_stock, v_nombre, v_es_insumo
-    from inventario_items where id = v_item_id;
+    if v_item_id is not null then
+      -- Empresa con catálogo: se separa del inventario disponible, FIFO,
+      -- igual que una venta.
+      select tipo, cantidad, nombre, es_insumo into v_tipo, v_stock, v_nombre, v_es_insumo
+      from inventario_items where id = v_item_id;
 
-    if v_es_insumo then
-      raise exception '"%" es material de receta y no se vende individualmente.', v_nombre;
+      if v_es_insumo then
+        raise exception '"%" es material de receta y no se vende individualmente.', v_nombre;
+      end if;
+      if v_stock < v_cantidad then
+        raise exception 'No hay suficiente stock de "%": quedan % y se intentó apartar %.', v_nombre, v_stock, v_cantidad;
+      end if;
+
+      v_costo := consumir_lotes_fifo(v_item_id, v_cantidad);
+
+      insert into inventario_movimientos (item_id, tipo, cantidad, nota)
+      values (v_item_id, 'salida', v_cantidad, 'Apartado — separado del inventario disponible');
+
+      update inventario_items set cantidad = cantidad - v_cantidad where id = v_item_id;
+
+      insert into apartados_items (apartado_id, item_id, cantidad, precio_unitario, costo_unitario)
+      values (v_apartado_id, v_item_id, v_cantidad, v_precio, v_costo);
+    else
+      -- Sin catálogo: nombre y costo escritos a mano, nada que descontar.
+      insert into apartados_items (apartado_id, nombre_libre, cantidad, precio_unitario, costo_unitario)
+      values (v_apartado_id, nullif(v_item->>'nombre_libre', ''), v_cantidad, v_precio, nullif(v_item->>'costo_unitario', '')::numeric);
     end if;
-    if v_stock < v_cantidad then
-      raise exception 'No hay suficiente stock de "%": quedan % y se intentó apartar %.', v_nombre, v_stock, v_cantidad;
-    end if;
-
-    v_costo := consumir_lotes_fifo(v_item_id, v_cantidad);
-
-    insert into inventario_movimientos (item_id, tipo, cantidad, nota)
-    values (v_item_id, 'salida', v_cantidad, 'Apartado — separado del inventario disponible');
-
-    update inventario_items set cantidad = cantidad - v_cantidad where id = v_item_id;
-
-    insert into apartados_items (apartado_id, item_id, cantidad, precio_unitario, costo_unitario)
-    values (v_apartado_id, v_item_id, v_cantidad, v_precio, v_costo);
   end loop;
 
   if p_monto_inicial > 0 then
@@ -1126,8 +1146,12 @@ begin
       v_venta_id := null;
     end if;
 
+    -- Solo las líneas con catálogo (item_id) tienen algo que devolver — las
+    -- de nombre_libre nunca descontaron nada al apartar.
     for v_item in
-      select item_id, cantidad, costo_unitario from apartados_items where apartado_id = v_apartado.id
+      select item_id, cantidad, costo_unitario
+      from apartados_items
+      where apartado_id = v_apartado.id and item_id is not null
     loop
       insert into inventario_lotes (item_id, cantidad_disponible, costo_unitario)
       values (v_item.item_id, v_item.cantidad, coalesce(v_item.costo_unitario, 0));

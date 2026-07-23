@@ -28,7 +28,7 @@ export default async function ApartadoPage({
 
   const { data: items } = await supabase
     .from("apartados_items")
-    .select("id, cantidad, precio_unitario, inventario_items ( nombre )")
+    .select("id, nombre_libre, cantidad, precio_unitario, inventario_items ( nombre )")
     .eq("apartado_id", id);
 
   const { data: abonos } = await supabase
@@ -109,7 +109,9 @@ export default async function ApartadoPage({
             const producto = item.inventario_items as unknown as { nombre: string } | null;
             return (
               <li key={item.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-gray-900">{producto?.nombre ?? "Producto"}</span>
+                <span className="text-gray-900">
+                  {producto?.nombre ?? item.nombre_libre ?? "Producto"}
+                </span>
                 <span className="text-gray-500">
                   {item.cantidad} × {formatoMoneda(item.precio_unitario)}
                 </span>

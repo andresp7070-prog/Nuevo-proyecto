@@ -98,7 +98,9 @@ export async function guardarVenta(input: {
 }
 
 export type ItemApartadoInput = {
-  itemId: string;
+  itemId: string | null;
+  nombreLibre: string | null;
+  costoUnitario: number | null;
   cantidad: number;
   precioUnitario: number;
 };
@@ -136,6 +138,8 @@ export async function registrarApartado(input: {
     p_cliente_email: input.clienteEmail || null,
     p_items: input.items.map((item) => ({
       item_id: item.itemId,
+      nombre_libre: item.nombreLibre,
+      costo_unitario: item.costoUnitario,
       cantidad: item.cantidad,
       precio_unitario: item.precioUnitario,
     })),

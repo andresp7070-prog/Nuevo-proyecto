@@ -40,16 +40,16 @@ export default async function NuevaVentaPage() {
   const crmActivo = (empresa?.modulos_activos ?? []).includes("crm");
   const inventarioActivo = (empresa?.modulos_activos ?? []).includes("inventario");
   // permite_apartados no depende de tener el módulo de Inventario contratado
-  // — son cosas aparte. Una empresa con apartados pero sin Inventario igual
-  // necesita elegir de un catálogo real al marcar "Es un apartado" (para
-  // poder separar la prenda), pero eso no le activa el módulo completo
-  // (proveedores, recetas, costos, etc.) ni se lo muestra en el menú.
+  // — son cosas aparte. Una empresa sin Inventario (ej. Manantial) arma un
+  // apartado exactamente igual que una venta normal sin catálogo: nombre y
+  // costo escritos a mano — el check de apartado solo le agrega el campo
+  // de abono inicial, nada de cambiar cómo se cargan los productos.
   const permiteApartados = Boolean(empresa?.permite_apartados);
-  const necesitaCatalogo = inventarioActivo || permiteApartados;
 
-  // Sin catálogo (ni Inventario ni apartados), la persona escribe libremente
-  // qué vendió, y solo le ayudamos con lo que ya haya escrito antes.
-  if (!necesitaCatalogo) {
+  // Sin el módulo de Inventario, la empresa no tiene catálogo — la persona
+  // escribe libremente qué vendió, y solo le ayudamos con lo que ya haya
+  // escrito antes, en vez de un catálogo real.
+  if (!inventarioActivo) {
     const { data: ventasPrevias } = await supabase
       .from("ventas_items")
       .select("nombre_libre, ventas!inner(empresa_id)")
@@ -70,7 +70,7 @@ export default async function NuevaVentaPage() {
         promociones={[]}
         crmActivo={crmActivo}
         puntoVentaId={puntoSeleccionado}
-        permiteApartados={false}
+        permiteApartados={permiteApartados}
       />
     );
   }
