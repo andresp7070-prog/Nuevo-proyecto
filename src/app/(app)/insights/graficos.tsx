@@ -279,6 +279,9 @@ export type BarraAgrupada = {
   // dibujar una barra en cero.
   valorB: number | null;
   textoB: string;
+  // Si viene, el grupo completo se puede hacer clic y navega ahí — mismo
+  // patrón que Barra.enlace en GraficoBarras.
+  enlace?: string;
 };
 
 export function GraficoBarrasAgrupadas({
@@ -332,8 +335,12 @@ export function GraficoBarrasAgrupadas({
             const yB = baseY - hB;
             const xB = xGrupo + anchoBarra + espacioBarras;
 
-            return (
-              <g key={i}>
+            const contenido = (
+              <g
+                onMouseEnter={() => setHover(`${i}g`)}
+                onMouseLeave={() => setHover(null)}
+                className={d.enlace ? "cursor-pointer" : "cursor-default"}
+              >
                 <rect
                   x={xGrupo}
                   y={yA}
@@ -341,10 +348,7 @@ export function GraficoBarrasAgrupadas({
                   height={hA}
                   rx={3}
                   fill={colorA}
-                  opacity={hover === `${i}a` ? 1 : 0.85}
-                  onMouseEnter={() => setHover(`${i}a`)}
-                  onMouseLeave={() => setHover(null)}
-                  className="cursor-default"
+                  opacity={hover === `${i}g` ? 1 : 0.85}
                 />
                 {hA > 0 && (
                   <text x={xGrupo + anchoBarra / 2} y={yA - 4} textAnchor="middle" fontSize={9} fill="#52514e">
@@ -360,10 +364,7 @@ export function GraficoBarrasAgrupadas({
                       height={hB}
                       rx={3}
                       fill={colorB}
-                      opacity={hover === `${i}b` ? 1 : 0.85}
-                      onMouseEnter={() => setHover(`${i}b`)}
-                      onMouseLeave={() => setHover(null)}
-                      className="cursor-default"
+                      opacity={hover === `${i}g` ? 1 : 0.85}
                     />
                     {hB > 0 && (
                       <text x={xB + anchoBarra / 2} y={yB - 4} textAnchor="middle" fontSize={9} fill="#52514e">
@@ -377,11 +378,19 @@ export function GraficoBarrasAgrupadas({
                   y={alto + 18}
                   textAnchor="middle"
                   fontSize={11}
-                  fill="#898781"
+                  fill={d.enlace ? "#1a1b33" : "#898781"}
+                  textDecoration={d.enlace ? "underline" : undefined}
                 >
                   {d.etiqueta}
                 </text>
               </g>
+            );
+            return d.enlace ? (
+              <a key={i} href={d.enlace} aria-label={`Filtrar por ${d.etiqueta}`}>
+                {contenido}
+              </a>
+            ) : (
+              <g key={i}>{contenido}</g>
             );
           })}
         </svg>

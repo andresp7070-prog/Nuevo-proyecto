@@ -528,15 +528,6 @@ async function ContenidoInsights({
     enlace: enlaceConFiltro({ dia_semana: d.dia }),
   }));
 
-  const barrasMes: Barra[] = [...porMes]
-    .sort((a, b) => a.mes.localeCompare(b.mes))
-    .map((f) => ({
-      etiqueta: etiquetaMesCorta(f.mes),
-      valor: f.utilidad_neta,
-      textoValor: formatoMonedaCorta(f.utilidad_neta),
-      enlace: enlaceConFiltro({ periodo: "personalizado", desde: primerDiaDelMes(f.mes), hasta: ultimoDiaDelMes(f.mes) }),
-    }));
-
   const barrasMargen: Barra[] = [...porProducto]
     .filter((p) => p.ingresos > 0)
     .sort((a, b) => b.margen_porcentaje - a.margen_porcentaje)
@@ -554,29 +545,39 @@ async function ContenidoInsights({
   );
   const mostrarPorAnio = sinFiltros && añosConVentas.size >= 2;
 
-  const barrasAnio: Barra[] = mostrarPorAnio
+  // "Rendimiento" combina ventas y utilidad en una sola gráfica protagonista
+  // — ventas (la línea de arriba) y utilidad (lo que de verdad queda) una al
+  // lado de la otra, mes a mes o año a año según cuántos datos haya.
+  const barrasRendimientoAnio: BarraAgrupada[] = mostrarPorAnio
     ? Array.from(
         porMes.reduce((mapa, f) => {
           const anio = f.mes.slice(0, 4);
-          mapa.set(anio, (mapa.get(anio) ?? 0) + f.ingresos_por_ventas);
+          const actual = mapa.get(anio) ?? { ingresos: 0, utilidad: 0 };
+          actual.ingresos += f.ingresos_por_ventas;
+          actual.utilidad += f.utilidad_neta;
+          mapa.set(anio, actual);
           return mapa;
-        }, new Map<string, number>()),
+        }, new Map<string, { ingresos: number; utilidad: number }>()),
       )
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([anio, total]) => ({
+        .map(([anio, v]) => ({
           etiqueta: anio,
-          valor: total,
-          textoValor: formatoMonedaCorta(total),
+          valorA: v.ingresos,
+          textoA: formatoMonedaCorta(v.ingresos),
+          valorB: v.utilidad,
+          textoB: formatoMonedaCorta(v.utilidad),
           enlace: enlaceConFiltro({ periodo: "personalizado", desde: `${anio}-01-01`, hasta: `${anio}-12-31` }),
         }))
     : [];
 
-  const barrasVentasMes: Barra[] = [...porMes]
+  const barrasRendimientoMes: BarraAgrupada[] = [...porMes]
     .sort((a, b) => a.mes.localeCompare(b.mes))
     .map((f) => ({
       etiqueta: etiquetaMesCorta(f.mes),
-      valor: f.ingresos_por_ventas,
-      textoValor: formatoMonedaCorta(f.ingresos_por_ventas),
+      valorA: f.ingresos_por_ventas,
+      textoA: formatoMonedaCorta(f.ingresos_por_ventas),
+      valorB: f.utilidad_neta,
+      textoB: formatoMonedaCorta(f.utilidad_neta),
       enlace: enlaceConFiltro({ periodo: "personalizado", desde: primerDiaDelMes(f.mes), hasta: ultimoDiaDelMes(f.mes) }),
     }));
 
@@ -702,22 +703,40 @@ async function ContenidoInsights({
       <div>
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Resumen general</h2>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border-2 border-gray-200 p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-medium text-gray-700">
-                {mostrarPorAnio ? "Ventas por año" : "Ventas por mes"}
-              </h3>
-              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
-            </div>
-            {(mostrarPorAnio ? barrasAnio : barrasVentasMes).length === 0 ? (
-              <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
-            ) : (
-              <GraficoBarras datos={mostrarPorAnio ? barrasAnio : barrasVentasMes} />
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="flex flex-col justify-center rounded-xl border-2 border-gray-200 bg-gray-50 p-4">
+            <h3 className="text-xs font-medium text-gray-700">Utilidad neta del período</h3>
+            <p className="mt-2 text-4xl font-semibold tabular-nums text-gray-900 sm:text-5xl">
+              {formatoMonedaCorta(utilidadNetaActual)}
+            </p>
+            {hayComparacion && (
+              <div className="mt-2">
+                <VariacionBadge actual={utilidadNetaActual} anterior={utilidadNetaAnterior} />
+              </div>
             )}
           </div>
 
-          <div className="rounded-xl border-2 border-gray-200 p-4">
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-medium text-gray-700">
+                {mostrarPorAnio ? "Rendimiento por año" : "Rendimiento por mes"}
+              </h3>
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+            </div>
+            {(mostrarPorAnio ? barrasRendimientoAnio : barrasRendimientoMes).length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
+            ) : (
+              <div className="flex justify-center">
+                <GraficoBarrasAgrupadas
+                  datos={mostrarPorAnio ? barrasRendimientoAnio : barrasRendimientoMes}
+                  leyendaA="Ventas"
+                  leyendaB="Utilidad"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Ventas por día</h3>
               {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
@@ -729,19 +748,7 @@ async function ContenidoInsights({
             )}
           </div>
 
-          <div className="rounded-xl border-2 border-gray-200 p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-medium text-gray-700">Ventas por hora del día</h3>
-              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
-            </div>
-            {ventasConHora.length === 0 ? (
-              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
-            ) : (
-              <GraficoLinea puntos={puntosHora} compacto />
-            )}
-          </div>
-
-          <div className="rounded-xl border-2 border-gray-200 p-4">
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Ventas por día de la semana</h3>
               {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
@@ -753,19 +760,7 @@ async function ContenidoInsights({
             )}
           </div>
 
-          <div className="rounded-xl border-2 border-gray-200 p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-medium text-gray-700">Utilidad por mes</h3>
-              {hayComparacion && <VariacionBadge actual={utilidadNetaActual} anterior={utilidadNetaAnterior} />}
-            </div>
-            {barrasMes.length === 0 ? (
-              <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
-            ) : (
-              <GraficoBarras datos={barrasMes} />
-            )}
-          </div>
-
-          <div className="rounded-xl border-2 border-gray-200 p-4">
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Categorías con más ventas</h3>
               {hayComparacion && (
@@ -779,7 +774,7 @@ async function ContenidoInsights({
             )}
           </div>
 
-          <div className="rounded-xl border-2 border-gray-200 p-4">
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Productos con más ventas</h3>
               {hayComparacion && (
@@ -793,8 +788,20 @@ async function ContenidoInsights({
             )}
           </div>
 
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-medium text-gray-700">Ventas por hora del día</h3>
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+            </div>
+            {ventasConHora.length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoLinea puntos={puntosHora} compacto />
+            )}
+          </div>
+
           {atiendeFestivos && (
-            <div className="rounded-xl border-2 border-gray-200 p-4">
+            <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-xs font-medium text-gray-700">Festivos vs. días normales</h3>
                 {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
@@ -802,12 +809,14 @@ async function ContenidoInsights({
               {promedioFestivo === null && promedioNoFestivo === null ? (
                 <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
               ) : (
-                <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
+                <div className="flex justify-center">
+                  <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
+                </div>
               )}
             </div>
           )}
 
-          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-xs font-medium text-gray-700">Margen por producto</h3>
               {hayComparacion && <VariacionBadge actual={utilidadNetaActual} anterior={utilidadAnteriorTotal} />}
