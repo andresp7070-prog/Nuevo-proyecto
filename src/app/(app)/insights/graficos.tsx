@@ -62,10 +62,15 @@ export function GraficoBarras({
   // juntas en vez de perdidas en un espacio vacío; a medida que hay más
   // datos, se van distribuyendo hasta llenar el espacio de verdad.
   const espacioMaximo = 40;
+  // Aire fijo a los lados — sin esto, la etiqueta de la primera o última
+  // barra (ej. "$678,8 k") puede sobresalir del ancho del SVG y quedar
+  // cortada en vez de solo apretada.
+  const margen = 28;
   const anchoNatural = datos.length * (anchoBarra + espacioMinimo) + espacioMinimo;
   const anchoMaximo = datos.length * (anchoBarra + espacioMaximo) + espacioMaximo;
-  const ancho = Math.min(Math.max(anchoNatural, anchoDisponible), anchoMaximo);
-  const espacio = (ancho - datos.length * anchoBarra) / (datos.length + 1);
+  const interior = Math.min(Math.max(anchoNatural, anchoDisponible - margen * 2), anchoMaximo);
+  const espacio = (interior - datos.length * anchoBarra) / (datos.length + 1);
+  const ancho = interior + margen * 2;
   const maxAbs = Math.max(1, ...datos.map((d) => Math.abs(d.valor)));
   const hayNegativos = datos.some((d) => d.valor < 0);
   const baseY = hayNegativos ? alto / 2 : alto - 8;
@@ -81,7 +86,7 @@ export function GraficoBarras({
       >
         <line x1={0} y1={baseY} x2={ancho} y2={baseY} stroke="#c3c2b7" strokeWidth={1} />
         {datos.map((d, i) => {
-          const x = espacio + i * (anchoBarra + espacio);
+          const x = margen + espacio + i * (anchoBarra + espacio);
           const h = Math.max(Math.abs(d.valor) * escala, 1);
           const y = d.valor >= 0 ? baseY - h : baseY;
           const color = COLOR[d.tono ?? tonoAutomatico(d.valor)];
@@ -340,11 +345,15 @@ export function GraficoBarrasAgrupadas({
   // grupos quedan juntos en vez de perdidos, y solo se separan de verdad a
   // medida que hay más datos.
   const espacioGrupoMaximo = 48;
+  // Aire fijo a los lados para que la etiqueta del primer o último grupo no
+  // se corte contra el borde del SVG.
+  const margen = 28;
   const grupoAncho = anchoBarra * 2 + espacioBarras;
   const anchoNatural = datos.length * (grupoAncho + espacioGrupoMinimo) + espacioGrupoMinimo;
   const anchoMaximo = datos.length * (grupoAncho + espacioGrupoMaximo) + espacioGrupoMaximo;
-  const ancho = Math.min(Math.max(anchoNatural, anchoDisponible), anchoMaximo);
-  const espacioGrupo = (ancho - datos.length * grupoAncho) / (datos.length + 1);
+  const interior = Math.min(Math.max(anchoNatural, anchoDisponible - margen * 2), anchoMaximo);
+  const espacioGrupo = (interior - datos.length * grupoAncho) / (datos.length + 1);
+  const ancho = interior + margen * 2;
   const maxAbs = Math.max(1, ...datos.map((d) => Math.max(d.valorA, d.valorB ?? 0)));
   const baseY = alto - 8;
   const escala = (alto - 8 - 28) / maxAbs;
@@ -365,7 +374,7 @@ export function GraficoBarrasAgrupadas({
         <svg width={ancho} height={alto + 24} role="img" aria-label="Gráfico de barras agrupadas">
           <line x1={0} y1={baseY} x2={ancho} y2={baseY} stroke="#c3c2b7" strokeWidth={1} />
           {datos.map((d, i) => {
-            const xGrupo = espacioGrupo + i * (grupoAncho + espacioGrupo);
+            const xGrupo = margen + espacioGrupo + i * (grupoAncho + espacioGrupo);
             const hA = d.valorA > 0 ? Math.max(d.valorA * escala, 2) : 0;
             const yA = baseY - hA;
             const hB = d.valorB !== null && d.valorB > 0 ? Math.max(d.valorB * escala, 2) : 0;
