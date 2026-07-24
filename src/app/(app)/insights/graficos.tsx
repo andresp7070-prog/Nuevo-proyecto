@@ -55,21 +55,30 @@ export function GraficoBarras({
 
   if (datos.length === 0) return null;
 
-  const anchoBarra = 48;
-  const espacioMinimo = 16;
-  // El espacio entre barras crece para llenar el ancho disponible, pero solo
-  // hasta este tope — con pocos datos (ej. 2-3 meses) las barras quedan
-  // juntas en vez de perdidas en un espacio vacío; a medida que hay más
-  // datos, se van distribuyendo hasta llenar el espacio de verdad.
-  const espacioMaximo = 40;
+  const anchoBarraMax = 48;
+  const anchoBarraMin = 20;
+  const espacioMinimo = 10;
   // Aire fijo a los lados — sin esto, la etiqueta de la primera o última
   // barra (ej. "$678,8 k") puede sobresalir del ancho del SVG y quedar
   // cortada en vez de solo apretada.
-  const margen = 28;
-  const anchoNatural = datos.length * (anchoBarra + espacioMinimo) + espacioMinimo;
-  const anchoMaximo = datos.length * (anchoBarra + espacioMaximo) + espacioMaximo;
-  const interior = Math.min(Math.max(anchoNatural, anchoDisponible - margen * 2), anchoMaximo);
-  const espacio = (interior - datos.length * anchoBarra) / (datos.length + 1);
+  const margen = 24;
+  const interiorDisponible = Math.max(0, anchoDisponible - margen * 2);
+
+  // Las barras crecen hasta 48px llenando el espacio disponible entre ellas;
+  // si con ese ancho no caben todas dentro del recuadro (ej. muchas horas
+  // del día), en vez de desbordarse y forzar scroll, se van angostando
+  // hasta un mínimo legible para que el gráfico siempre quede completo y
+  // centrado en su espacio.
+  let anchoBarra = anchoBarraMax;
+  let espacio = (interiorDisponible - datos.length * anchoBarra) / (datos.length + 1);
+  if (espacio < espacioMinimo) {
+    espacio = espacioMinimo;
+    anchoBarra = Math.max(
+      anchoBarraMin,
+      (interiorDisponible - (datos.length + 1) * espacio) / datos.length,
+    );
+  }
+  const interior = datos.length * anchoBarra + (datos.length + 1) * espacio;
   const ancho = interior + margen * 2;
   const maxAbs = Math.max(1, ...datos.map((d) => Math.abs(d.valor)));
   const hayNegativos = datos.some((d) => d.valor < 0);
