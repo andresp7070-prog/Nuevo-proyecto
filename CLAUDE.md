@@ -101,9 +101,11 @@ Definida con el caso base de un negocio de productos de aseo del hogar (sin serv
 - `vista_efectividad_promociones` ya trae todo lo necesario para la pantalla de desempeño: ventas que usaron el descuento, ticket promedio de esas ventas, unidades con descuento, dinero regalado, y las ventas totales de todo el período de la campaña (para comparar campaña vs. período sin campaña) — no recalcular nada de esto en el frontend.
 - Al hacer clic en una campaña se despliega el detalle completo que ya da esa vista — no hace falta una consulta distinta para eso.
 
-### Insights — principio, no especificación todavía
+### Insights (Panel de control) — construido
 
-Sin construir aún (Fase 4). Pero ya queda establecido el principio: los insights se calculan sobre los datos reales de ventas, CRM, inventario, P y G y promociones — nunca son un texto genérico ni igual para todas las empresas. Un insight vale la pena si cambia cuando cambian los datos. Cuando lleguemos a esta fase, cada insight debe poder explicarse con una consulta concreta sobre las tablas y vistas que ya existen, no con lógica inventada aparte.
+Los insights se calculan sobre los datos reales de ventas, CRM, inventario, P y G y promociones — nunca son un texto genérico ni igual para todas las empresas. Un insight vale la pena si cambia cuando cambian los datos; cada uno se explica con una consulta concreta sobre las tablas y vistas que ya existen, no con lógica inventada aparte.
+
+- **Respeta el horario real del negocio**, para no mostrarle datos que no le aplican: `empresas.hora_apertura` / `hora_cierre` recortan la gráfica "Ventas por hora del día" a solo las horas en que de verdad atiende (si abre a las 10, no le muestra la hora 9 en $0); `empresas.atiende_festivos` (default `true`) oculta por completo la comparación de festivos vs. días normales cuando el negocio nunca abre festivos — comparar contra $0 todos los festivos no es información, es ruido. Las tres columnas son opcionales y se activan a mano, empresa por empresa (mismo criterio que `crm_modo`) — sin configurarlas, el comportamiento es el de siempre.
 
 ### Migración de datos — reglas cerradas
 
@@ -132,9 +134,10 @@ Manantial (tienda de ropa) vende con "apartados": el cliente abona una parte, la
 | CRM | **especificación cerrada** — ver detalle arriba, listo para construir |
 | Inventario | **especificación cerrada** — ver detalle arriba, listo para construir |
 | Estado de pérdidas y ganancias | **especificación cerrada** — ver detalle arriba, listo para construir |
-| Proyecciones e insights | por construir — ver principio arriba; capa transversal, no una pantalla aislada |
+| Proyecciones e insights | **construido** — Panel de control, ver detalle arriba |
 | Descuentos y promociones | **especificación cerrada** — ver detalle arriba, listo para construir |
-| Facturación electrónica | **fuera de alcance por ahora.** Requiere integración con un proveedor tecnológico habilitado por la DIAN. No construir un sistema de facturación desde cero. |
+| Facturación electrónica | **fuera de alcance por ahora, en revisión.** Requiere integración con un proveedor tecnológico habilitado por la DIAN — no se va a construir un sistema de facturación propio desde cero. Varios clientes reales lo han pedido (ya tienen esto resuelto con Siigo), así que vale la pena investigar proveedores e integración antes de descartarlo del todo — pero es una decisión de negocio (con quién integrarse, cómo se cobra) antes que una tarea de código. No escribir código de facturación sin definir ese rumbo primero. |
+| Nómina | **por construir, alcance completo** — no un simple gasto recurrente más: empleados, salario, deducciones de ley (salud, pensión, ARL, prestaciones sociales) y desprendible de pago. Módulo grande, con reglas legales colombianas reales — necesita su propia sesión dedicada de diseño antes de escribir código, no se ha empezado. |
 
 ## Orden de construcción
 1. Cimientos: login + esquema + Row Level Security funcionando, de punta a punta

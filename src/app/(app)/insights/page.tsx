@@ -302,6 +302,24 @@ async function ContenidoInsights({
   }
   const empresaId = perfil.empresa_id;
 
+  // Horario real del negocio — para no mostrar comparaciones ni horas que no
+  // le aplican (festivos si nunca abre esos días, horas fuera de atención).
+  // Sin configurar (null / true por defecto), el comportamiento es
+  // exactamente el de siempre: se asume que aplica todo.
+  const { data: empresaHorario } = await supabase
+    .from("empresas")
+    .select("hora_apertura, hora_cierre, atiende_festivos")
+    .eq("id", empresaId)
+    .single();
+
+  const horaApertura = empresaHorario?.hora_apertura
+    ? Number(empresaHorario.hora_apertura.slice(0, 2))
+    : null;
+  const horaCierre = empresaHorario?.hora_cierre
+    ? Number(empresaHorario.hora_cierre.slice(0, 2))
+    : null;
+  const atiendeFestivos = empresaHorario?.atiende_festivos ?? true;
+
   // El punto de venta se elige desde el selector de la barra lateral (una
   // sola vez para toda la sesión), no con un filtro propio de esta página —
   // así queda consistente con Ventas, Inventario y P y G.
@@ -476,12 +494,25 @@ async function ContenidoInsights({
     const horaColombia = sinFiltros ? (horaUtc + 24 - 5) % 24 : horaUtc;
     totalPorHora[horaColombia] += v.monto;
   }
-  const puntosHora: PuntoLinea[] = totalPorHora.map((total, hora) => ({
-    etiqueta: `${hora}h`,
-    valor: total,
-    textoValor: formatoMonedaCorta(total),
-    mostrarEtiqueta: hora % 3 === 0,
-  }));
+  // Si el negocio tiene horario configurado, la gráfica solo muestra esas
+  // horas — mostrar el resto en $0 no informa nada, solo estira la gráfica
+  // con horas en las que ni siquiera está abierto. Contempla el caso de un
+  // negocio que cierra después de medianoche (ej. 18h a 2h).
+  function dentroDelHorario(hora: number) {
+    if (horaApertura === null || horaCierre === null) return true;
+    if (horaApertura <= horaCierre) return hora >= horaApertura && hora <= horaCierre;
+    return hora >= horaApertura || hora <= horaCierre;
+  }
+
+  const puntosHora: PuntoLinea[] = totalPorHora
+    .map((total, hora) => ({ total, hora }))
+    .filter(({ hora }) => dentroDelHorario(hora))
+    .map(({ total, hora }) => ({
+      etiqueta: `${hora}h`,
+      valor: total,
+      textoValor: formatoMonedaCorta(total),
+      mostrarEtiqueta: hora % 3 === 0,
+    }));
 
   // ---- Datos para las gráficas ----
   const barrasDiaSemana: Barra[] = porDiaSemana.map((d) => ({
@@ -605,7 +636,7 @@ async function ContenidoInsights({
     });
   }
 
-  if (promedioFestivo !== null && promedioNoFestivo !== null && promedioNoFestivo > 0) {
+  if (atiendeFestivos && promedioFestivo !== null && promedioNoFestivo !== null && promedioNoFestivo > 0) {
     const diferencia = (promedioFestivo - promedioNoFestivo) / promedioNoFestivo;
     if (Math.abs(diferencia) >= UMBRAL_DESVIACION_DIA) {
       insights.push({
@@ -762,17 +793,19 @@ async function ContenidoInsights({
             )}
           </div>
 
-          <div className="rounded-xl border-2 border-gray-200 p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-medium text-gray-700">Festivos vs. días normales</h3>
-              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+          {atiendeFestivos && (
+            <div className="rounded-xl border-2 border-gray-200 p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-xs font-medium text-gray-700">Festivos vs. días normales</h3>
+                {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+              </div>
+              {promedioFestivo === null && promedioNoFestivo === null ? (
+                <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+              ) : (
+                <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
+              )}
             </div>
-            {promedioFestivo === null && promedioNoFestivo === null ? (
-              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
-            ) : (
-              <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
-            )}
-          </div>
+          )}
 
           <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

@@ -48,6 +48,14 @@ create table empresas (
   -- criterio que crm_modo, pero esto ni siquiera es un módulo de precios,
   -- es una función hecha a la medida (ver la sección de Planes y precios).
   permite_apartados boolean not null default false,
+  -- Horario real del negocio, para que Panel de control no muestre datos que
+  -- no le aplican: horas fuera de atención en "Ventas por hora del día", o
+  -- la comparación de festivos si nunca abre esos días. Sin configurar
+  -- (el valor por defecto de cada una), el comportamiento es el de
+  -- siempre — se activa a mano, empresa por empresa, igual que crm_modo.
+  hora_apertura time,
+  hora_cierre time,
+  atiende_festivos boolean not null default true,
   fecha_diagnostico date,
   -- Catálogo fijo de métodos de pago (igual para toda la plataforma); cada
   -- empresa activa cuáles acepta. Editable por ahora en la tabla de Supabase.
