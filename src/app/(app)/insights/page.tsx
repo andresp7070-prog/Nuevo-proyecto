@@ -667,6 +667,30 @@ async function ContenidoInsights({
             )}
           </div>
 
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-medium text-gray-700">Ventas por día de la semana</h3>
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+            </div>
+            {promedioGeneral > 0 ? (
+              <GraficoBarras datos={barrasDiaSemana} />
+            ) : (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-medium text-gray-700">Ventas por hora del día</h3>
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+            </div>
+            {ventasConHora.length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoBarras datos={barrasHora} />
+            )}
+          </div>
+
           {atiendeFestivos && (
             <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -706,30 +730,6 @@ async function ContenidoInsights({
               <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
             ) : (
               <GraficoBarrasHorizontal datos={barrasProductoVentas} />
-            )}
-          </div>
-
-          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-medium text-gray-700">Ventas por día de la semana</h3>
-              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
-            </div>
-            {promedioGeneral > 0 ? (
-              <GraficoBarras datos={barrasDiaSemana} />
-            ) : (
-              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
-            )}
-          </div>
-
-          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-medium text-gray-700">Ventas por hora del día</h3>
-              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
-            </div>
-            {ventasConHora.length === 0 ? (
-              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
-            ) : (
-              <GraficoBarras datos={barrasHora} />
             )}
           </div>
 
