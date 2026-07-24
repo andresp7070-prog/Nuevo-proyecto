@@ -72,10 +72,6 @@ type FilaUnificada = {
 
 const NOMBRE_DIA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-function formatoMoneda(valor: number) {
-  return valor.toLocaleString("es-CO", { style: "currency", currency: "COP" });
-}
-
 function formatoMonedaCorta(valor: number) {
   return valor.toLocaleString("es-CO", {
     style: "currency",
@@ -83,12 +79,6 @@ function formatoMonedaCorta(valor: number) {
     notation: "compact",
     maximumFractionDigits: 1,
   });
-}
-
-function etiquetaMes(mes: string) {
-  return primeraMayuscula(
-    new Date(mes).toLocaleDateString("es-CO", { month: "long", year: "numeric" }),
-  );
 }
 
 function etiquetaMesCorta(mes: string) {
@@ -504,14 +494,13 @@ async function ContenidoInsights({
     return hora >= horaApertura || hora <= horaCierre;
   }
 
-  const puntosHora: PuntoLinea[] = totalPorHora
+  const barrasHora: Barra[] = totalPorHora
     .map((total, hora) => ({ total, hora }))
     .filter(({ hora }) => dentroDelHorario(hora))
     .map(({ total, hora }) => ({
       etiqueta: `${hora}h`,
       valor: total,
       textoValor: formatoMonedaCorta(total),
-      mostrarEtiqueta: hora % 3 === 0,
     }));
 
   // ---- Datos para las gráficas ----
@@ -614,74 +603,6 @@ async function ContenidoInsights({
   const ingresosProductosActual = porProducto.reduce((s, p) => s + p.ingresos, 0);
   const categoriaIngresosActual = porCategoria.reduce((s, c) => s + c.ingresos, 0);
 
-  // ---- Insights: solo lo que cruza un umbral, ordenados por cuánta plata
-  // representan — para que lo que más importa quede arriba, no lo primero
-  // que se calculó. El "impacto" siempre combina al menos dos señales (ej.
-  // qué tan grave + qué tan grande en ventas), nunca es solo un porcentaje
-  // aislado.
-  type Insight = { titulo: string; detalle: string; impacto: number };
-  const insights: Insight[] = [];
-
-  if (mejorDiaDestaca && mejorDia) {
-    insights.push({
-      titulo: `Vendes más los ${mejorDia.dia}`,
-      detalle: `Promedias ${formatoMoneda(mejorDia.promedio)} ese día, contra ${formatoMoneda(promedioGeneral)} en un día cualquiera.`,
-      impacto: (mejorDia.promedio - promedioGeneral) * mejorDia.diasConVenta,
-    });
-  }
-  if (peorDiaDestaca && peorDia) {
-    insights.push({
-      titulo: `Vendes menos los ${peorDia.dia}`,
-      detalle: `Promedias ${formatoMoneda(peorDia.promedio)} ese día, contra ${formatoMoneda(promedioGeneral)} en un día cualquiera.`,
-      impacto: (promedioGeneral - peorDia.promedio) * peorDia.diasConVenta,
-    });
-  }
-
-  if (atiendeFestivos && promedioFestivo !== null && promedioNoFestivo !== null && promedioNoFestivo > 0) {
-    const diferencia = (promedioFestivo - promedioNoFestivo) / promedioNoFestivo;
-    if (Math.abs(diferencia) >= UMBRAL_DESVIACION_DIA) {
-      insights.push({
-        titulo: diferencia > 0 ? "Vendes más en festivos" : "Vendes menos en festivos",
-        detalle: `Promedias ${formatoMoneda(promedioFestivo)} en festivos, contra ${formatoMoneda(promedioNoFestivo)} en un día normal.`,
-        impacto: Math.abs(promedioFestivo - promedioNoFestivo) * festivos.length,
-      });
-    }
-  }
-
-  // Margen bajo, pero pesado por cuánto vende ese producto: un margen
-  // terrible en algo que casi no se vende importa menos que un margen
-  // apenas bajo en el producto que más factura.
-  const productosMargenBajo = porProducto
-    .filter((p) => p.ingresos > 0 && p.margen_porcentaje < UMBRAL_MARGEN_BAJO)
-    .map((p) => ({ ...p, impacto: p.ingresos * ((UMBRAL_MARGEN_BAJO - p.margen_porcentaje) / 100) }))
-    .sort((a, b) => b.impacto - a.impacto)
-    .slice(0, 3);
-
-  for (const p of productosMargenBajo) {
-    insights.push({
-      titulo: `Margen bajo en "${p.nombre}"`,
-      detalle:
-        p.margen_porcentaje < 0
-          ? `Lo estás vendiendo con pérdida: ${p.margen_porcentaje}% de margen, y ya factura ${formatoMoneda(p.ingresos)}.`
-          : `Solo ${p.margen_porcentaje}% de margen — revisa su costo o precio de venta. Factura ${formatoMoneda(p.ingresos)}.`,
-      impacto: p.impacto,
-    });
-  }
-
-  if (sinFiltros && porMes.length >= 2) {
-    const ordenadoDesc = [...porMes].sort((a, b) => b.mes.localeCompare(a.mes));
-    const [ultimo, anterior] = ordenadoDesc;
-    if (ultimo.utilidad_neta < anterior.utilidad_neta) {
-      insights.push({
-        titulo: `La utilidad bajó en ${etiquetaMes(ultimo.mes)}`,
-        detalle: `Utilidad neta de ${formatoMoneda(ultimo.utilidad_neta)}, contra ${formatoMoneda(anterior.utilidad_neta)} en ${etiquetaMes(anterior.mes)}.`,
-        impacto: anterior.utilidad_neta - ultimo.utilidad_neta,
-      });
-    }
-  }
-
-  insights.sort((a, b) => b.impacto - a.impacto);
-
   const hayComparacion = Boolean(rango);
 
   return (
@@ -704,7 +625,7 @@ async function ContenidoInsights({
         <h2 className="mb-3 text-sm font-semibold text-gray-900">Resumen general</h2>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="flex flex-col justify-center rounded-xl border-2 border-gray-200 bg-gray-50 p-4">
+          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-gray-200 bg-gray-50 p-4 text-center">
             <h3 className="text-xs font-medium text-gray-700">Utilidad neta del período</h3>
             <p className="mt-2 text-4xl font-semibold tabular-nums text-gray-900 sm:text-5xl">
               {formatoMonedaCorta(utilidadNetaActual)}
@@ -726,13 +647,11 @@ async function ContenidoInsights({
             {(mostrarPorAnio ? barrasRendimientoAnio : barrasRendimientoMes).length === 0 ? (
               <p className="text-sm text-gray-400">Aún no hay datos suficientes.</p>
             ) : (
-              <div className="flex justify-center">
-                <GraficoBarrasAgrupadas
-                  datos={mostrarPorAnio ? barrasRendimientoAnio : barrasRendimientoMes}
-                  leyendaA="Ventas"
-                  leyendaB="Utilidad"
-                />
-              </div>
+              <GraficoBarrasAgrupadas
+                datos={mostrarPorAnio ? barrasRendimientoAnio : barrasRendimientoMes}
+                leyendaA="Ventas"
+                leyendaB="Utilidad"
+              />
             )}
           </div>
 
@@ -788,20 +707,8 @@ async function ContenidoInsights({
             )}
           </div>
 
-          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-medium text-gray-700">Ventas por hora del día</h3>
-              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
-            </div>
-            {ventasConHora.length === 0 ? (
-              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
-            ) : (
-              <GraficoLinea puntos={puntosHora} compacto />
-            )}
-          </div>
-
           {atiendeFestivos && (
-            <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-2">
+            <div className="rounded-xl border-2 border-gray-200 p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-xs font-medium text-gray-700">Festivos vs. días normales</h3>
                 {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
@@ -809,12 +716,22 @@ async function ContenidoInsights({
               {promedioFestivo === null && promedioNoFestivo === null ? (
                 <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
               ) : (
-                <div className="flex justify-center">
-                  <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
-                </div>
+                <GraficoBarrasAgrupadas datos={barrasAgrupadasFestivos} leyendaA="Normal" leyendaB="Festivo" />
               )}
             </div>
           )}
+
+          <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-medium text-gray-700">Ventas por hora del día</h3>
+              {hayComparacion && <VariacionBadge actual={totalVentasActual} anterior={totalVentasAnterior} />}
+            </div>
+            {ventasConHora.length === 0 ? (
+              <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+            ) : (
+              <GraficoBarras datos={barrasHora} />
+            )}
+          </div>
 
           <div className="rounded-xl border-2 border-gray-200 p-4 md:col-span-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -829,35 +746,6 @@ async function ContenidoInsights({
           </div>
 
         </div>
-      </div>
-
-      <hr className="border-gray-200" />
-
-      <div>
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Insights encontrados</h2>
-        <p className="mb-3 text-xs text-gray-400">Ordenados por cuánta plata representan, no por orden de cálculo.</p>
-        {insights.length === 0 ? (
-          <p className="text-sm text-gray-400">
-            Todavía no hay suficientes datos, o todo está dentro de lo normal — no hay nada que
-            señalar por ahora.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {insights.map((insight, i) => (
-              <li key={i} className="rounded-xl border-2 border-gray-200 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium text-gray-900">{insight.titulo}</p>
-                  {insight.impacto > 0 && (
-                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
-                      ≈ {formatoMonedaCorta(insight.impacto)}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500">{insight.detalle}</p>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
     </div>
   );

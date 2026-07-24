@@ -1,6 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+// Mide el ancho real disponible del contenedor (vía ResizeObserver) para que
+// las gráficas de barras puedan estirar el espacio entre barras y llenar el
+// espacio asignado, sin engordar el grosor de cada barra — ese se mantiene
+// fijo, solo crece el aire entre una y otra.
+function useAnchoContenedor() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [ancho, setAncho] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entradas) => setAncho(entradas[0].contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, ancho] as const;
+}
 
 export type Barra = {
   etiqueta: string;
@@ -32,19 +51,22 @@ export function GraficoBarras({
   alto?: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [contenedorRef, anchoDisponible] = useAnchoContenedor();
 
   if (datos.length === 0) return null;
 
-  const anchoBarra = 48;
-  const espacio = 16;
-  const ancho = datos.length * (anchoBarra + espacio) + espacio;
+  const anchoBarra = 24;
+  const espacioMinimo = 16;
+  const anchoNatural = datos.length * (anchoBarra + espacioMinimo) + espacioMinimo;
+  const ancho = Math.max(anchoNatural, anchoDisponible);
+  const espacio = (ancho - datos.length * anchoBarra) / (datos.length + 1);
   const maxAbs = Math.max(1, ...datos.map((d) => Math.abs(d.valor)));
   const hayNegativos = datos.some((d) => d.valor < 0);
   const baseY = hayNegativos ? alto / 2 : alto - 8;
   const escala = (hayNegativos ? alto / 2 - 20 : alto - 8 - 20) / maxAbs;
 
   return (
-    <div className="flex justify-center overflow-x-auto">
+    <div ref={contenedorRef} className="w-full overflow-x-auto">
       <svg
         width={ancho}
         height={alto + 24}
@@ -300,14 +322,17 @@ export function GraficoBarrasAgrupadas({
   alto?: number;
 }) {
   const [hover, setHover] = useState<string | null>(null);
+  const [contenedorRef, anchoDisponible] = useAnchoContenedor();
 
   if (datos.length === 0) return null;
 
   const anchoBarra = 18;
   const espacioBarras = 3;
-  const espacioGrupo = 22;
+  const espacioGrupoMinimo = 22;
   const grupoAncho = anchoBarra * 2 + espacioBarras;
-  const ancho = datos.length * (grupoAncho + espacioGrupo) + espacioGrupo;
+  const anchoNatural = datos.length * (grupoAncho + espacioGrupoMinimo) + espacioGrupoMinimo;
+  const ancho = Math.max(anchoNatural, anchoDisponible);
+  const espacioGrupo = (ancho - datos.length * grupoAncho) / (datos.length + 1);
   const maxAbs = Math.max(1, ...datos.map((d) => Math.max(d.valorA, d.valorB ?? 0)));
   const baseY = alto - 8;
   const escala = (alto - 8 - 28) / maxAbs;
@@ -324,7 +349,7 @@ export function GraficoBarrasAgrupadas({
           {leyendaB}
         </span>
       </div>
-      <div className="flex justify-center overflow-x-auto">
+      <div ref={contenedorRef} className="w-full overflow-x-auto">
         <svg width={ancho} height={alto + 24} role="img" aria-label="Gráfico de barras agrupadas">
           <line x1={0} y1={baseY} x2={ancho} y2={baseY} stroke="#c3c2b7" strokeWidth={1} />
           {datos.map((d, i) => {
